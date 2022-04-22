@@ -9,6 +9,7 @@
 
 # TODO : clear confusion betweend dir_name and rootdir
 #        add creation/modification date/time as field
+#        if there is an error, you have to start all over again with reading the directories
 
 
 # Import libraries
@@ -33,7 +34,11 @@ def convert_txt_to_ocr(file_name):
     pytesseract.pytesseract.tesseract_cmd = (
         r"C:\Program Files\Tesseract-OCR\tesseract.exe"
     )
-    text = str(((pytesseract.image_to_string(Image.open(file_name)))))
+    try:
+        text = str(((pytesseract.image_to_string(Image.open(file_name)))))
+    except:
+        print (f"Error reading {file_name}")
+        text = ""
     return text
 
 
@@ -44,7 +49,7 @@ def txt_to_ocr(dir_name, item, extensionsToCheck):
             file_name = dir_name + os.sep + item
             print(f"Processing {file_name}")
             text = convert_txt_to_ocr(file_name)
-            if len(text) > 0:
+            if len(text) > 0 :
                 return text
             else:
                 print(f"No text found in {file_name}")
@@ -106,9 +111,12 @@ def read_db(keyword):
 
     """    
     # keyword = "vegan"
+    if keyword is not None:
+        sql_statement = f" SELECT directory, filename, text_in_image FROM txt_from_images where text_in_image LIKE '%{keyword}%'"
+    else:
 
-    sql_statement = f" SELECT directory, filename, text_in_image FROM txt_from_images where text_in_image LIKE '%{keyword}%'"
-    dir_name = r"C:\Users\rcxsm\Pictures\ocr_test"
+        sql_statement = f" SELECT directory, filename, text_in_image FROM txt_from_images" 
+    dir_name = r"C:\Users\rcxsm\Pictures"
 
     db_name = dir_name + os.sep + "my_test.db"
     con = sl.connect(db_name)
@@ -187,3 +195,5 @@ def main():
 
 
 main()
+
+#read_db(None)
