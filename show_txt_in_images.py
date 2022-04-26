@@ -4,7 +4,7 @@ import streamlit as st
 import os
 from PIL import Image
 
-def delete_db(dir):
+def delete_records_from_db(dir):
     sql_statement = f"DELETE FROM txt_from_images WHERE directory = '{dir}'"
     db_name = dir + os.sep + "my_test.db"
     con = sl.connect(db_name)
@@ -20,16 +20,14 @@ def read_db(filter_file_name, filter_keyword):
     """Search the database for a certain keyword and/or directory
     """    
     #TODO implement filter for directory
-
+    sql_statement = f" SELECT directory || '\\' || filename AS complete_path, text_in_image FROM txt_from_images "
     if filter_keyword is not None and filter_file_name is not None:
-        sql_statement = f" SELECT directory || '\\' || filename AS complete_path, text_in_image FROM txt_from_images WHERE  (text_in_image LIKE '%{filter_keyword}%' AND complete_path LIKE '%{filter_file_name}%' )"
+        sql_statement = sql_statement + f"WHERE  (text_in_image LIKE '%{filter_keyword}%' AND complete_path LIKE '%{filter_file_name}%' )"
     elif filter_keyword is  None and filter_file_name is not None:
-        sql_statement = f" SELECT directory || ' \\' || filename AS complete_path, text_in_image FROM txt_from_images WHERE  (complete_path LIKE '%{filter_file_name}%' )"
+        sql_statement = sql_statement + f"WHERE  (complete_path LIKE '%{filter_file_name}%' )"
     elif filter_keyword is not None and filter_file_name is  None:
-        sql_statement = f" SELECT directory || ' \\' || filename AS complete_path, text_in_image FROM txt_from_images WHERE  (text_in_image LIKE '%{filter_keyword}%' )"
-    elif filter_keyword is None and filter_file_name is  None:
-        sql_statement = f" SELECT directory || ' \\' || filename AS complete_path,  text_in_image FROM txt_from_images" 
-    
+        sql_statement = sql_statement + f"WHERE  (text_in_image LIKE '%{filter_keyword}%' )"
+        
     dir_name = r"C:\Users\rcxsm\Pictures\ocr_test"
     dir_name = r"C:\Users\rcxsm\Pictures\div\mijn autos\b"
 
@@ -47,6 +45,7 @@ def read_db(filter_file_name, filter_keyword):
         st.write("Error reading the data. Did you use forbidden characters ?")
 
     if len(df)< 101:
+        # iterrows is very slow when having too much records
         for index, row in df.iterrows():    
             url = (f"{row['complete_path']}")
             text=  row['text_in_image']
@@ -77,12 +76,10 @@ def main():
         read_db(filter_file_name, filter_text)
     elif action == "delete":
         # delete records from a specific directory
-        dir = r"C:\Users\rcxsm\Pictures\div\mijn autos\b"
-        delete_db(dir)
+        dir = r"C:\Users\rcxsm\Pictures\div\mijn autos\b\2020"
+        delete_records_from_db(dir)
     else:
         st.write("Give a valid action")
-
-
 
 if __name__ == "__main__":
     st.set_page_config(layout="wide")
