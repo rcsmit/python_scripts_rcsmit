@@ -21,7 +21,6 @@ import time
 import sqlite3 as sl
 import pandas as pd
 
-
 def convert_txt_to_ocr(file_name):
     """Really recognize the text in the image to text
     Args:
@@ -37,8 +36,8 @@ def convert_txt_to_ocr(file_name):
     try:
         text = str(((pytesseract.image_to_string(Image.open(file_name)))))
     except:
-        print (f"Error reading {file_name}")
-        text = ""
+        text = (f"Error reading {file_name}")
+        #text = ""
     return text
 
 
@@ -57,7 +56,7 @@ def txt_to_ocr(dir_name, item, extensionsToCheck):
 
 def save_text(text, filename, modus, dir_name, rootdir):
     """Save/append the text to a file"""
-    print(f"Saving {filename}")
+    #print(f"Saving {filename}")
 
     if modus == "new":
         filename = filename.replace(".PNG", "_PNG")
@@ -68,19 +67,16 @@ def save_text(text, filename, modus, dir_name, rootdir):
         filename_txt = filename + ".txt"
 
         with open(filename_txt, "w") as f:
-            print(f"Saving {filename}")
+            #print(f"Saving {filename}")
             f.write(text)
     elif modus == "append":
         file_to_save = rootdir + os.sep + " text_in_images.txt"
         with open(file_to_save, "a") as f:
             print(f"Adding {filename} to textfile")
-            # f.write('\n')
-            # f.write('\n')
             f.write(f"\n\n=== {dir_name} \ {filename} ===\n")
-            # f.write('\n')
             f.write(text)
     else:
-        print("ERROR IN ' modus'")
+        print("ERROR IN 'modus'")
 
 def insert_text_to_database( con, directory, filename, text):
     """Insert the text in the database
@@ -105,31 +101,12 @@ def take_action_with_text(dir_name, modus, action, text, file_name,rootdir,con):
         else:
             print ("ERROR in 'action'")
 
-def read_db(keyword):
-    """Search the database for a certain keyword
-    Should be in a seperate script and made webbased, just added here to show the possibilities after the OCR process
-
-    """    
-    # keyword = "vegan"
-    if keyword is not None:
-        sql_statement = f" SELECT directory, filename, text_in_image FROM txt_from_images where text_in_image LIKE '%{keyword}%'"
-    else:
-
-        sql_statement = f" SELECT directory, filename, text_in_image FROM txt_from_images" 
-    dir_name = r"C:\Users\rcxsm\Pictures"
-
-    db_name = dir_name + os.sep + "my_test.db"
-    con = sl.connect(db_name)
-
-    df = pd.read_sql(sql_statement, con)
-    print (df)
-
-    # TODO: nice interface, show also the image as clickable thumbnail
-
 
 def main():
     ######################################################################
-    dir_name = r"C:\Users\rcxsm\Pictures\ocr_test"
+    #dir_name = r"C:\Users\rcxsm\Pictures\ocr_test"
+    #dir_name = r"C:\Users\rcxsm\Pictures\div\mijn autos\b"
+    dir_name = r"C:\Users\rcxsm\Pictures\div\mijn autos\b\dls\various"
     extensionsToCheck = [".jpg", ".JPG", ".jpeg", ".png", ".PNG"]
     modus = "new"  # "append"  # 'new' to place text in seperate textfiles, ' append' to put all text in one file
     to_do = "including_subdirectories"#  "single_directory" #"including_subdirectories"
@@ -152,6 +129,7 @@ def main():
             print ("Table exists already")
     else:
         con = None
+
     s1 = int(time.time())
 
     if to_do == "single_directory":
@@ -166,7 +144,6 @@ def main():
             text = txt_to_ocr(dir_name, file, extensionsToCheck)
             take_action_with_text(dir_name, modus, action, text, file,rootdir,con)
             n = n + 1
-
 
     elif to_do == "including_subdirectories":
         rootdir = dir_name
@@ -183,17 +160,6 @@ def main():
     s2x = s2 - s1
     print("Downloading  took " + str(s2x) + " seconds ....")
 
-    if action == "save_to_database":
-        # show all the records
-        with con:
-            data = con.execute("SELECT * FROM txt_from_images")
-            for row in data:
-                print(row)
+if __name__ == "__main__":
+    main()
 
-        # show the results containing a certain keyword
-        read_db('vegan')
-
-
-main()
-
-#read_db(None)
