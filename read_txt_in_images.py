@@ -102,6 +102,18 @@ def take_action_with_text(dir_name, modus, action, text, file_name,rootdir,con):
             print ("ERROR in 'action'")
 
 
+def convert_pdf(dir_name):
+    """Convert PDF to image. Very slow, it takes 70 seconds for a file of 5 pages.
+        Has to be implemented further in this script.  UNDER CONSTRUCTION
+    Args:
+        dir_name (_type_): _description_
+    """     
+    pages = convert_from_path(r"C:\Users\rcxsm\Pictures\ocr_test\deloitte\reactie-op-brief-deloitte.pdf", 500,  poppler_path=r"C:\Program Files\poppler\Library\bin")
+    print ("Pages converted")
+    for x, page in enumerate(pages):
+        print (f"Saving page {x}/{len(pages)}")
+        page.save(f'C:\\Users\\rcxsm\\Pictures\\ocr_test\\deloitte\\deloitte_{x}.jpg', 'JPEG')
+
 def main():
     ######################################################################
     #dir_name = r"C:\Users\rcxsm\Pictures\ocr_test"

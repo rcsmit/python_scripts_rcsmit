@@ -1,6 +1,6 @@
 # Having fun with Cartopy.
 # inspired by the work of @pythonmaps on Twitter
-# eg. https://twitter.com/PythonMaps/status/1391056641546768388
+# eg. https://twitter.com/PythonMaps/ppstatus/1391056641546768388
 
 # Rene Smit, 10th of May 2021, MIT-License
 

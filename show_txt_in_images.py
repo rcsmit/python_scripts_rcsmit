@@ -29,7 +29,6 @@ def read_db(filter_file_name, filter_keyword):
         sql_statement = sql_statement + f"WHERE  (text_in_image LIKE '%{filter_keyword}%' )"
         
     dir_name = r"C:\Users\rcxsm\Pictures\ocr_test"
-    dir_name = r"C:\Users\rcxsm\Pictures\div\mijn autos\b"
 
     db_name = dir_name + os.sep + "my_test.db"
     con = sl.connect(db_name)
@@ -51,7 +50,7 @@ def read_db(filter_file_name, filter_keyword):
             text=  row['text_in_image']
             try:
                 image = Image.open(url)
-                st.image(image, caption=url)
+                st.image(image, width=300, caption=url)
             except:
                 st.write (f"{url} - not found")
             if len(row['text_in_image'])>400:
@@ -76,7 +75,7 @@ def main():
         read_db(filter_file_name, filter_text)
     elif action == "delete":
         # delete records from a specific directory
-        dir = r"C:\Users\rcxsm\Pictures\div\mijn autos\b\2020"
+        dir =  r"C:\Users\rcxsm\Pictures\ocr_test"
         delete_records_from_db(dir)
     else:
         st.write("Give a valid action")

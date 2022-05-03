@@ -49,7 +49,7 @@ def cleanup(test_string):
     Returns:
         result_string (string) : string without the bad characters
     """
-    bad_chars = [":", ";", ",", "/", ":", "!", "|",'",' "'", "*", "(", ")"]
+    bad_chars = [":", ";", ",", "/", ":", "!", "|",'",' "'", "*", "(", ")", "[", "]", "„", '"']
     result_string = "".join(i for i in test_string if not i in bad_chars)
     # result_string = result_string.replace(" ", "_")
     return result_string
