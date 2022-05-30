@@ -183,11 +183,19 @@ def download_file(durl, path_to_save, what, start_time, end_time, convert):
 
     elif what == "video":
         YouTube(durl).streams.get_by_itag(18).download(filename=mp4)  # for video 360p
+
+        if start_time == None:
+            new_filename = (
+                left(mp4, (len(mp4) - 4)) + ".mp4"
+            )  # for some reason files are saved as namemp4.mp4
+        else:
+            new_filename = crop_file_video(mp4, start_time, end_time)
+
         s2 = int(time.time())
         s2x = s2 - s1
         print("Downloading  took " + str(s2x) + " seconds ....")
 
-
+    
 def download_playlist(url, path_to_save, what, ask, wait, START):
     """Downlaods the sound of the videos in a playlist
 
@@ -328,12 +336,12 @@ def main_download(
 
 
 def main():
-    # what = "video"
+    #what = "video"
     what = "audio"
-    start_time = None
-    end_time = 120 + 49
+    start_time = None # 83 #none
+    end_time = 130
     path_to_save = "C:\\Users\\rcxsm\\Music\\MET PYTHON GEDOWNLOAD\\"
-    convert = True
+    convert = False
 
     ask = True  # ask if you want to download each file
     wait = True  # wait a random number of seconds in between the downloads

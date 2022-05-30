@@ -514,7 +514,7 @@ def main():
 
         playgame()
         printx (f"------------/{play}--------------")
-    #plotresults()
+    plotresults()
 
     s2 = (int(time.time()))
     s2x = s2-s1

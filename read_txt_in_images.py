@@ -118,14 +118,19 @@ def main():
     ######################################################################
     #dir_name = r"C:\Users\rcxsm\Pictures\ocr_test"
     #dir_name = r"C:\Users\rcxsm\Pictures\div\mijn autos\b"
-    dir_name = r"C:\Users\rcxsm\Pictures\div\mijn autos\b\dls\various"
+    #dir_name = r"C:\Users\rcxsm\Pictures\div\mijn autos\b\dls\various"
+
+    dir_name = r"C:\Users\rcxsm\Downloads\Sheetmusic\sheetmusic\gefotografeerd"
+    dir_name_db = r"C:\Users\rcxsm\Downloads\Sheetmusic\sheetmusic\gefotografeerd"
+    # dir_name = r"C:\Users\rcxsm\Pictures\div\mijn autos\b\dls\2022c"
+    # dir_name_db = r"C:\Users\rcxsm\Pictures\div\mijn autos\b"
     extensionsToCheck = [".jpg", ".JPG", ".jpeg", ".png", ".PNG"]
     modus = "new"  # "append"  # 'new' to place text in seperate textfiles, ' append' to put all text in one file
     to_do = "including_subdirectories"#  "single_directory" #"including_subdirectories"
     action = "save_to_database" #"save_to_txt_file" #"save_to_database"
     #######################################################################
     if action == "save_to_database":
-        db_name = dir_name + os.sep + "my_test.db"
+        db_name = dir_name_db + os.sep + "my_test.db"
         con = sl.connect(db_name)
         try:
             with con:
