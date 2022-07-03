@@ -66,7 +66,7 @@ def read_db(filter_file_name, filter_keyword, db_name):
 def main():
     action = "show"
 
-    database_file_name_= r"C:\Users\rcxsm\Downloads\Sheetmusic\sheetmusic\gefotografeerd\my_test.db"
+    database_file_name_=r"C:\Users\rcxsm\Pictures\div\mijn autos\b\my_test.db" # r"C:\Users\rcxsm\Downloads\Sheetmusic\sheetmusic\gefotografeerd\my_test.db"
     if action == "show":
         col1,col2,col3 = st.columns(3)
         with col1:

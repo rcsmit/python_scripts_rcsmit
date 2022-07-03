@@ -1,0 +1,63 @@
+Golden Ratios in Vertical Facial Dimensions
+
+#1	Eyes	Nose flare	Nose base
+#2	Eyes	Nostril top	Center of lips
+#3	Eyes	Nose base	Bottom of lips
+#4	Eyes	Center of lips	Bottom of chin
+#5	Nose flare	Bottom of lips	Bottom of chin
+#6	Nose flare	Top of lips	Bottom of chin
+#7	Top of lips	Bottom of lips	Bottom of chin
+#8	Top of lips	Center of lips	Bottom of lips
+#9	Arc of eyebrows	Top of eyes	Bottom of eyes
+#10	Arc of eyebrows	Top of lips	Bottom of chin
+#18	Center of pupils	Top of nose flare	Bottom of nose
+#22	Bottom of nose	Top of lips	Bottom of lips
+Golden Ratios in Horizontal Facial Dimensions
+
+#11	Side of face	Outside of eyes	Center of pupil
+#12	Side of face	Outside of iris	Inside of eye
+#13	Side of face	Inside of iris	Center of face
+#14	Side of face	Inside of near eye	Inside of opposite eye
+#15	Side of face	Center of face	Outside of opposite eye
+#16	Side of face	Inside opposite eye	Opposite side of face
+#17	Outside of eyes	Flare of nose	
+#19	Center of pupils	Bridge of nose	Center of nostrils
+#20	Inside of eyes	Inside of nostrils	
+#21	Width of mouth	Cupid’s bow	
+Golden Ratios in Dimensions of the Head
+
+#23	Head height	Head width	
+#24	Golden spiral arc of lower portion of face
+https://www.goldennumber.net/facial-beauty-golden-ratio-florence-colgate/
+
+
+
+Meisner Beauty Guide for Golden Ratio Facial Analysis
+Reference
+Number	Starting point	Golden ratio point	End point
+Golden Ratios in Dimensions of the Head
+
+HW	Head height (1 to 33)	Height to width	 Head width at ears (19 to 20)
+Golden Ratios in Vertical (top to bottom) Facial Dimensions
+
+V1	Center of pupils (11, 12)	Center of lips (31)	Bottom of chin (33)
+V2	Center of pupils (11, 12)	Nose at nostrils (23, 24)	Bottom of chin (33)
+V3	Center of pupils (11, 12)	Nose flair top (21, 22)	Nose base (25, 26)
+V4	Top arc of eyebrows (3, 4)	Top of eyes (9, 10)	Bottom of eyes (17, 18)
+V5	Center of pupils (11, 12)	Nose at nostrils (23, 24)	Center of lips (29, 31)
+V6	Top of lips (27, 28)	Center of lips (29, 31)	Bottom of lips (32)
+V7	Nose at nostrils (23, 24)	Top of lips (27, 28)	Center of lips (29, 31)
+Golden Ratios in Horizontal (side to side) Facial Dimensions
+(These have Left-Right Symmetry)
+
+H1	Side of face (19)	Inside of near eye (15)	Opposite side of face (20)
+H2	Side of face (19)	Inside of near eye (15)	Inside of opposite eye (16)
+H3	Center of face (2, 33)	Outside edge of eye (13)	Side of face (19)
+H4	Side of face (19)	Outside edge of eye (13)	Inside edge of eye (15)
+H5	Side of face (19)	Outside of eye brow (7)	Outside edge of eye (13)
+H6	Center of face (2, 33)	Width of nose (24)	Width of mouth (30)
+H7	Side of mouth (29)	Cupid’s bow (27, 28)	Opposite side of mouth (30)
+H8	Width of central incisor tooth	Width of lateral incisor tooth	
+
+https://www.goldennumber.net/meisner-beauty-guide-golden-ratio-facial-analysis/
+https://www.goldennumber.net/meisner-beauty-guide-golden-ratio-facial-analysis/#jp-carousel-9357

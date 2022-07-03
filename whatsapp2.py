@@ -15,8 +15,8 @@ def fun(day,mon,year):
 		return day
 print('Enter path to your file:')
 #file=input()
-file = 'C:\\Users\\rcxsm\\Documents\\pyhton_scripts\\in\\WhatsApp-chat met Go ABCDE Joost.txt'
-
+#file = 'C:\\Users\\rcxsm\\Documents\\pyhton_scripts\\in\\WhatsApp-chat met Go ABCDE Joost.txt'
+file =r"C:\Users\rcxsm\Documents\python_scripts\in\WhatsApp-chat met Go ABCDE Joost.txt"
 print("Whatsapp Chat Analyzer!")
 f=open(file,encoding="utf8")
 print ("--")
