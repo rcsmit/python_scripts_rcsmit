@@ -1,4 +1,5 @@
 
+
 # -*- coding: utf-8 -*-
 """
 Created on Thu Oct 22 12:04:30 2020
@@ -158,9 +159,9 @@ from plotly import offline
 from matplotlib import pyplot as plt
 from collections import Counter
 
-#numberofgames = 1_000_000
+numberofgames = 1_000_00
 
-numberofgames = 1
+#numberofgames = 1
 
 numberofrounds = 0
 currentposition = 0
@@ -170,8 +171,8 @@ started = False
 route = []
 r = 1
 printregel=[]
-debug = True
-#explanation = True
+debug = False
+explanation = False
 
 
 # https://irgp2.ru/en/igra-lila-moi-opyt-ispolzovaniya-kosmicheskaya-igra-dzhagat-lila/
@@ -274,6 +275,28 @@ specials= (
             [44,9],
             [52,35],
             [72,51])
+specials2 = (
+        #ladders
+        [1,38],
+        [4,14],
+        [9,31],
+        [21,42],
+        [28,84],
+        [36,44],
+        [51,67],
+        [71,91],
+        [80,100],
+        #snakes
+        [16,6],
+        [47,26],
+        [49,11],
+        [56,53],
+        [62,19],
+        [64,60],
+        [87,24],
+        [93,73],
+        [95,75],
+        [98,78])
 results=[]
 
 def throw_dice():
@@ -331,7 +354,7 @@ def explanation(a):
                 else:
                     printx (f"{s[0]}. {s[1]} ({s[2]})")
                 printx (s[3])
-                print ("\n-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n")
+                printx ("\n-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n")
 
 def plotresults():
     """ plot the results """
@@ -419,7 +442,7 @@ def playgame():
     global printregel
     #time.sleep(0.25)
 
-    input("Press Enter to roll the dice ...")
+    #input("Press Enter to roll the dice ...")
 
     thrown = throw_dice()
     route.append(thrown)
@@ -478,7 +501,7 @@ def playgame():
                 #r+=1
                 pass
 
-            if play % 100_000 == 0:
+            if play % 10_000 == 0:
                 # print a line to show progress one time per 100k games
                 print (f"{play}th game - YOU ARRIVED AT COSMIC CONSCIOUSNESS (#68) in {numberofrounds} ROUNDS")
             results.append(numberofrounds)
@@ -486,7 +509,7 @@ def playgame():
             playgame()
     else:
         # Player didn't throw a 6 yet to start
-        print ("You have to throw a 6 to start")
+        printx ("You have to throw a 6 to start")
         playgame()
 
 
@@ -501,7 +524,7 @@ def main():
 
     s1 = (int(time.time()))
     #
-    drawboard()
+    #drawboard()
     #printcards()
 
     for play in range(1,(numberofgames+1)):

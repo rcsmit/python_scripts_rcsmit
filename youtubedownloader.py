@@ -49,7 +49,7 @@ def cleanup(test_string):
     Returns:
         result_string (string) : string without the bad characters
     """
-    bad_chars = [":", ";", ",", "/", ":", "!", "|",'",' "'", "*", "(", ")", "[", "]", "„", '"']
+    bad_chars = [":", ";", ",", "/", ":", "!","?", "|",'",' "'", "*", "(", ")", "[", "]", "„", '"']
     result_string = "".join(i for i in test_string if not i in bad_chars)
     # result_string = result_string.replace(" ", "_")
     return result_string
@@ -191,10 +191,7 @@ def download_file(durl, path_to_save, what, start_time, end_time, convert):
         else:
             new_filename = crop_file_video(mp4, start_time, end_time)
 
-        s2 = int(time.time())
-        s2x = s2 - s1
-        print("Downloading  took " + str(s2x) + " seconds ....")
-
+        
     
 def download_playlist(url, path_to_save, what, ask, wait, START):
     """Downlaods the sound of the videos in a playlist
@@ -336,10 +333,10 @@ def main_download(
 
 
 def main():
-    #what = "video"
-    what = "audio"
-    start_time = None #131 # None # 83 #none
-    end_time = 311
+    what = "video"
+    #what = "audio"
+    start_time = None #144 #198 # None# 5 # None #(0*60)+28 # None #131 # None # 83 #none
+    end_time = None # 424 #  # None #300 #None #(3*60)+42 #311
     path_to_save = "C:\\Users\\rcxsm\\Music\\MET PYTHON GEDOWNLOAD\\"
     convert = False
 

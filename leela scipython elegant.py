@@ -18,7 +18,7 @@ import seaborn as sns
 #trans = ladders + snakes
 
 
-ladders = [(9,22),(16,68),(19,31),( 
+laddersx = [(9,22),(16,68),(19,31),( 
     
     21,59),( 
     26,40),( 
@@ -29,7 +29,7 @@ ladders = [(9,22),(16,68),(19,31),(
     45,61),( 
     53,67)]
         
-snakes = [(62,1),( 
+snakesx = [(62,1),( 
     54,2),( 
     15,3),( 
     
@@ -40,11 +40,31 @@ snakes = [(62,1),(
     43,8),( 
     51,34),( 
     72,51)]
-trans = ladders + snakes
 
+ladders = [
+    (1,38),
+    (4,14),
+    (9,31),
+    (21,42),
+    (28,84),
+    (36,44),
+    (51,67),
+    (71,91),
+    (80,100)]
+snakes = [(16,6),
+    (47,26),
+    (49,11),
+    (56,53),
+    (62,19),
+    (64,60),
+    (87,24),
+    (93,73),
+    (95,75),
+    (98,78)]
+trans = ladders + snakes
 # Set up the transition matrix
-T = np.zeros((73, 73))
-for i in range(1,73):
+T = np.zeros((101, 101))
+for i in range(1,101):
     T[i-1,i:i+6] = 1/6
 
 for (i1,i2) in trans:
@@ -53,12 +73,12 @@ for (i1,i2) in trans:
     T[iw,i2] += 1/6
 
 # House rules: you don't need to land on 100, just reach it.
-T[67:72,72] += np.linspace(1/6, 5/6, 5)
+T[95:100,100] += np.linspace(1/6, 5/6, 5)
 for snake in snakes:
-    T[snake,72] = 0
+    T[snake,100] = 0
 
 # The player starts at position 0.
-v = np.zeros(73)
+v = np.zeros(101)
 v[0] = 1
 
 n, P = 0, []
@@ -68,7 +88,7 @@ cumulative_prob = 0
 while cumulative_prob < 0.99999:
     n += 1
     v = v.dot(T)
-    P.append(v[72])
+    P.append(v[100])
     cumulative_prob += P[-1]
 mode = np.argmax(P)+1
 print('modal number of moves:', mode)
