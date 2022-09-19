@@ -18,6 +18,8 @@ def generate_df(file, show_image, save_image, img_out):
         static_image_mode=True,
         min_detection_confidence=0.5) as face_mesh:
         image = cv2.imread(file)
+        
+           
         # Convert the BGR image to RGB before processing.
         results = face_mesh.process(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
 
@@ -54,8 +56,6 @@ def generate_df(file, show_image, save_image, img_out):
                 relative_y = int(y * shape[0])
 
                 cv2.circle(image, (relative_x, relative_y), radius=1, color=(225, 0, 100), thickness=1)
-
-              
                 font = cv2.FONT_HERSHEY_COMPLEX_SMALL
                 # cv2.putText(image,str(i),(relative_x, relative_y), font, 1, (255,255,255), 1, cv2.LINE_AA)
                
@@ -78,6 +78,9 @@ def calculate_beauty(df, url):
     # https://www.goldennumber.net/meisner-beauty-guide-golden-ratio-facial-analysis/
     # top of head wordt niet gemeten #1
 
+    # facemesh landmarks https://github.com/google/mediapipe/blob/a908d668c730da128dfa8d9f6bd25d519d006692/mediapipe/modules/face_geometry/data/canonical_face_model_uv_visualization.png
+    # https://github.com/rcsmit/python_scripts_rcsmit/blob/master/extras/Gal_Gadot_by_Gage_Skidmore_4_5000x5921_annotated_black_letters.jpg
+    # https://github.com/rcsmit/python_scripts_rcsmit/blob/master/extras/Gal_Gadot_by_Gage_Skidmore_4_5000x5921_annotated_white_letters.jpg
     center_face_top =  (df.iloc[10,0],df.iloc[10,1]) #2
   
     top_arc_eyebrows_l =  (df.iloc[105,0],df.iloc[105,1]) #3
@@ -164,14 +167,12 @@ def calculate_beauty(df, url):
     score2 = (A+B)/(C+D)
     score3a = width_of_mouth / width_of_nose #geeft geen goede resultaten
     score3 = ((score1+score2)/2)/1.618*100
+    score4 = 100 - (1.618 - ((score1+score2)/2)/1.618*100)
     if score3>100:
         score3=1/score3*10000
-    txtx = (f"Score 1 {score1} - Score2 {score2}- score3 {round(score3,1)} % ")
+    txtx = (f"Ratio 1 {round(score1,2)} - Ratio 2  {round(score2,2)}  - Ratio 3a  {round(score3a,2)} - score {round(score3,1)} % - score2 {round(score4,1)} %  ")
     print (txtx)
    
-
-
-    
     # print (A,B,C)
     # import numpy as np
     # data = [A,B,C]
@@ -242,10 +243,13 @@ def calculate_beauty(df, url):
     if score>1:
         score = 1/(score)
     
-    print (f"Score : {round (score*100,1)} %")
+    print (f"Score 4 : {round (score*100,1)} %")
     # draw on photo
     txt = (f"{round(score3,1)} % ")
     ####
+    #make_drawings_on_photo(df, url, center_face_top, inside_arc_eyebrows_l, inside_arc_eyebrows_r, outside_arc_eyebrows_l, outside_arc_eyebrows_r, center_pupil_c, outside_eye_l, outside_eye_r, inside_eye_l, inside_eye_r, side_of_face_l, side_of_face_r, nose_base_c, middle_of_lips_l, middle_of_lips_r, middle_of_lips_c, bottom_of_chin, nose_zijkant_neusvleugel_c, score1, score2, txt)
+    cv2.destroyAllWindows()
+def make_drawings_on_photo(df, url, center_face_top, inside_arc_eyebrows_l, inside_arc_eyebrows_r, outside_arc_eyebrows_l, outside_arc_eyebrows_r, center_pupil_c, outside_eye_l, outside_eye_r, inside_eye_l, inside_eye_r, side_of_face_l, side_of_face_r, nose_base_c, middle_of_lips_l, middle_of_lips_r, middle_of_lips_c, bottom_of_chin, nose_zijkant_neusvleugel_c, score1, score2, txt):
     draw_mask2(df,url)
     
     draw_mask(url, side_of_face_l, side_of_face_r,middle_of_lips_l, middle_of_lips_r, 
@@ -256,7 +260,7 @@ def calculate_beauty(df, url):
 
     draw_vertical_lines(url, outside_eye_l, inside_eye_l, inside_eye_r, outside_eye_r, side_of_face_l, side_of_face_r)
 
-    cv2.destroyAllWindows()
+    
 
 def draw_mask2(df,url):
 
@@ -277,8 +281,7 @@ def draw_mask2(df,url):
     #  * =============================================================================
     #  */
 
-    print (len(df))
-
+    
     MESH_ANNOTATIONS = {'silhouette': [
         10,  338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288,
         397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136,
@@ -551,12 +554,13 @@ def main():
        
         img_in10=r"C:\Users\rcxsm\Downloads\Screenshot_20220702-143356_Chrome.jp4g"
         img_in11=r"C:\Users\rcxsm\Downloads\Lengths-of-the-face-and-set-of-ideal-proportions.png"
-        img_in12=r"C:\Users\rcxsm\Downloads\florence-colgate-perfect-beautiful-face-golden-ratio.jpg"
+        img_in12=r"C:\Users\rcxsm\Pictures\div\mijn autos\b\dls\2022e\florence-colgate-perfect-beautiful-face-golden-ratio.jpg"
         img_in13=r"C:\Users\rcxsm\Documents\python_scripts\python_scripts_rcsmit\extras\images.jpg" #1.618 perfect model
         img_in14=r"C:\Users\rcxsm\Downloads\another_perfect_face.jpg"
-        img_in15=r"C:\Users\rcxsm\Downloads\another_perfect_face2.jpg"
+        #img_in15=r"C:\Users\rcxsm\Downloads\another_perfect_face2.jpg"
         img_in16=r"C:\Users\rcxsm\Downloads\perfect_doll.jpg"
-        images_in = [img_in15]#, img_in15]#,img_in7, img_in2,img_in12, ] #,img_in4,img_in5, img_in6,img_in7,img_in8,img_in9,img_in10, img_in11,img_in12]
+        img_in15=r"C:\Users\rcxsm\Pictures\div\mijn autos\b\dls\test\Screenshot_20200927-195518_Instagram.jpg"
+        images_in = [img_in12]#, img_in15]#,img_in7, img_in2,img_in12, ] #,img_in4,img_in5, img_in6,img_in7,img_in8,img_in9,img_in10, img_in11,img_in12]
         show_image =False
         save_image = False
         save_csv = False

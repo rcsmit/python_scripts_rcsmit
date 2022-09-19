@@ -5,7 +5,7 @@ import datetime
 import numpy as np
 import pandas as pd
 
-season_start, season_end = 3, 10
+season_start, season_end = 2,9
 length_season = season_end - season_start + 1
 month_list, years_list, workdays_years = (
     [
