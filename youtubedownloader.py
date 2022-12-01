@@ -203,8 +203,8 @@ def download_file(durl, path_to_save, what, start_time, end_time, convert):
     mp4 = "%s.mp4" % _filename
 
     if os.path.isfile(mp4):
-        print("File exist already. I stop")
-        sys.exit()
+        print(f"File [{mp4}] exist already. I stop")
+        return
 
     print(f"Downloading.... {_filename}")
 
@@ -386,26 +386,36 @@ def main_download(
 def main():
     #what = "video"
     what = "audio"
-    start_time = (2*60)+31 #None # 1.1 # None # 0 # None #144 #198 # None# 5 # None #(0*60)+28 # None #131 # None # 83 #none
-    end_time = (6*60)+35 # None # 234 # None # 424 #  # None #300 #None #(3*60)+42 #311
+    start_time =    None # (2*60)+31 #None # 1.1 # None # 0 # None #144 #198 # None# 5 # None #(0*60)+28 # None #131 # None # 83 #none
+    end_time =   None #(4*60)+8 # None # 234 # None # 424 #  # None #300 #None #(3*60)+42 #311
     path_to_save = "C:\\Users\\rcxsm\\Music\\MET PYTHON GEDOWNLOAD\\"
     convert = False
 
-    ask = True  # ask if you want to download each file
+    ask = False # ask if you want to download each file
     wait = True  # wait a random number of seconds in between the downloads
     get_clipboard = True
     get_url_list = False
-    url_list = [
-        "https://www.youtube.com/watch?v=0-7IHOXkiV8",
-        "https://www.youtube.com/watch?v=WNeLUngb-Xg",
-        "https://www.youtube.com/watch?v=_F3mLfP-yFs",
-        "https://www.youtube.com/watch?v=UtF6Jej8yb4",
-        "https://www.youtube.com/watch?v=piOIvNO2M8Q",
-        "https://www.youtube.com/watch?v=6wwuEXlIniU",
-        "https://www.youtube.com/watch?v=AbuyS22oMgk",
-        "https://www.youtube.com/watch?v=VXXlPiDnkNg",
-        "https://www.youtube.com/watch?v=PWqEPKduGm8",
-    ]
+    url_list =["https://www.youtube.com/watch?v=b7QlX3yR2xs",
+                "https://www.youtube.com/watch?v=mkR_Qwix4Ho",
+                "https://www.youtube.com/watch?v=lvHZjvIyqsk",
+                "https://www.youtube.com/watch?v=ycE7bUq3-2k",
+                "https://www.youtube.com/watch?v=XqN2qFvY64U",
+                "https://www.youtube.com/watch?v=7Gbg6Z70J7E",
+                "https://www.youtube.com/watch?v=Odh9ddPUkEY",
+                "https://www.youtube.com/watch?v=xxrf_QBD5DE",
+                "https://www.youtube.com/watch?v=Uoey4W_3bos",
+                "https://www.youtube.com/watch?v=XzKSPRqFg9E",
+                "https://www.youtube.com/watch?v=xTXsKMXUi7w",
+                "https://www.youtube.com/watch?v=rg18Kf4en2o",
+                "https://www.youtube.com/watch?v=rn0brgg2BpI",
+                "https://www.youtube.com/watch?v=Tmz1lz0zcLQ",
+                "https://www.youtube.com/watch?v=iFX6_9h7th0",
+                "https://www.youtube.com/watch?v=l8Tps3PITx4",
+                "https://www.youtube.com/watch?v=ySZGZrcqvr4",
+                "https://www.youtube.com/watch?v=-qee6dFKlw4",
+                "https://www.youtube.com/watch?v=Y2a73EvnZ4s",
+                "https://www.youtube.com/watch?v=B-MfwP_RmHY",
+                "https://www.youtube.com/watch?v=X0Jti9F-oQA"]  #TAYLOR  SWIFT MIDNIGHT DREAMS CD
     # DOWNLOAD AUDIO OR VIDEO FROM A URL OR LIST
 
     main_download(
