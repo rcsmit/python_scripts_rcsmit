@@ -163,14 +163,14 @@ def calculate_beauty(df, url):
 
     D = bottom_of_chin[1] - middle_of_lips_c[1]
 
-    score1 = (B+C)/D
-    score2 = (A+B)/(C+D)
+    ratio1 = (B+C)/D
+    ratio2 = (A+B)/(C+D)
     score3a = width_of_mouth / width_of_nose #geeft geen goede resultaten
-    score3 = ((score1+score2)/2)/1.618*100
-    score4 = 100 - (1.618 - ((score1+score2)/2)/1.618*100)
+    score3 = ((ratio1+ratio2)/2)/1.618*100
+    score4 = ((ratio1+ratio2)/2)/1.618*100
     if score3>100:
         score3=1/score3*10000
-    txtx = (f"Ratio 1 {round(score1,2)} - Ratio 2  {round(score2,2)}  - Ratio 3a  {round(score3a,2)} - score {round(score3,1)} % - score2 {round(score4,1)} %  ")
+    txtx = (f"Ratio 1 {round(ratio1,2)} - Ratio 2  {round(ratio2,2)}  - Ratio 3a  {round(score3a,2)} - score3  {round(score3,1)} % - score4 {round(score4,1)} %  ")
     print (txtx)
    
     # print (A,B,C)
@@ -247,16 +247,16 @@ def calculate_beauty(df, url):
     # draw on photo
     txt = (f"{round(score3,1)} % ")
     ####
-    #make_drawings_on_photo(df, url, center_face_top, inside_arc_eyebrows_l, inside_arc_eyebrows_r, outside_arc_eyebrows_l, outside_arc_eyebrows_r, center_pupil_c, outside_eye_l, outside_eye_r, inside_eye_l, inside_eye_r, side_of_face_l, side_of_face_r, nose_base_c, middle_of_lips_l, middle_of_lips_r, middle_of_lips_c, bottom_of_chin, nose_zijkant_neusvleugel_c, score1, score2, txt)
+    make_drawings_on_photo(df, url, center_face_top, inside_arc_eyebrows_l, inside_arc_eyebrows_r, outside_arc_eyebrows_l, outside_arc_eyebrows_r, center_pupil_c, outside_eye_l, outside_eye_r, inside_eye_l, inside_eye_r, side_of_face_l, side_of_face_r, nose_base_c, middle_of_lips_l, middle_of_lips_r, middle_of_lips_c, bottom_of_chin, nose_zijkant_neusvleugel_c, ratio1, ratio2, txt)
     cv2.destroyAllWindows()
-def make_drawings_on_photo(df, url, center_face_top, inside_arc_eyebrows_l, inside_arc_eyebrows_r, outside_arc_eyebrows_l, outside_arc_eyebrows_r, center_pupil_c, outside_eye_l, outside_eye_r, inside_eye_l, inside_eye_r, side_of_face_l, side_of_face_r, nose_base_c, middle_of_lips_l, middle_of_lips_r, middle_of_lips_c, bottom_of_chin, nose_zijkant_neusvleugel_c, score1, score2, txt):
+def make_drawings_on_photo(df, url, center_face_top, inside_arc_eyebrows_l, inside_arc_eyebrows_r, outside_arc_eyebrows_l, outside_arc_eyebrows_r, center_pupil_c, outside_eye_l, outside_eye_r, inside_eye_l, inside_eye_r, side_of_face_l, side_of_face_r, nose_base_c, middle_of_lips_l, middle_of_lips_r, middle_of_lips_c, bottom_of_chin, nose_zijkant_neusvleugel_c, ratio1, ratio2, txt):
     draw_mask2(df,url)
     
     draw_mask(url, side_of_face_l, side_of_face_r,middle_of_lips_l, middle_of_lips_r, 
                 bottom_of_chin, nose_base_c, 
                 inside_eye_r, inside_eye_l,   outside_eye_l, outside_eye_r, 
                 inside_arc_eyebrows_l,inside_arc_eyebrows_r, outside_arc_eyebrows_l,outside_arc_eyebrows_r)
-    draw_horizontal_lines (url, center_face_top, center_pupil_c, middle_of_lips_c, bottom_of_chin, nose_zijkant_neusvleugel_c, nose_base_c, score1, score2, txt)
+    draw_horizontal_lines (url, center_face_top, center_pupil_c, middle_of_lips_c, bottom_of_chin, nose_zijkant_neusvleugel_c, nose_base_c, ratio1, ratio2, txt)
 
     draw_vertical_lines(url, outside_eye_l, inside_eye_l, inside_eye_r, outside_eye_r, side_of_face_l, side_of_face_r)
 
@@ -560,7 +560,8 @@ def main():
         #img_in15=r"C:\Users\rcxsm\Downloads\another_perfect_face2.jpg"
         img_in16=r"C:\Users\rcxsm\Downloads\perfect_doll.jpg"
         img_in15=r"C:\Users\rcxsm\Pictures\div\mijn autos\b\dls\test\Screenshot_20200927-195518_Instagram.jpg"
-        images_in = [img_in12]#, img_in15]#,img_in7, img_in2,img_in12, ] #,img_in4,img_in5, img_in6,img_in7,img_in8,img_in9,img_in10, img_in11,img_in12]
+        img_in16=r"C:\Users\rcxsm\Downloads\Screenshot_20220920-210948_Instagram.jpg"
+        images_in = [img_in15]#, img_in15]#,img_in7, img_in2,img_in12, ] #,img_in4,img_in5, img_in6,img_in7,img_in8,img_in9,img_in10, img_in11,img_in12]
         show_image =False
         save_image = False
         save_csv = False
