@@ -386,8 +386,8 @@ def main_download(
 def main():
     #what = "video"
     what = "audio"
-    start_time =    None # (2*60)+31 #None # 1.1 # None # 0 # None #144 #198 # None# 5 # None #(0*60)+28 # None #131 # None # 83 #none
-    end_time =   None #(4*60)+8 # None # 234 # None # 424 #  # None #300 #None #(3*60)+42 #311
+    start_time = None # 11#   None # (2*60)+31 #None # 1.1 # None # 0 # None #144 #198 # None# 5 # None #(0*60)+28 # None #131 # None # 83 #none
+    end_time =  None # (3*60)+5 # None # 234 # None # 424 #  # None #300 #None #(3*60)+42 #311
     path_to_save = "C:\\Users\\rcxsm\\Music\\MET PYTHON GEDOWNLOAD\\"
     convert = False
 

@@ -88,6 +88,7 @@ def main():
             df_totaal = pd.merge(df_totaal, df_currency, on="Date", how="outer")
     
     df_totaal = fill_up_weekend_days(df_totaal)
+    df_totaal["EUR"] = 1.0
     print (df_totaal)
     save_df(df_totaal, "currencydata_2016_2022")
 
