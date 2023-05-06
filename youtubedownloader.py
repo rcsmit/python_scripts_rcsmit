@@ -14,16 +14,23 @@ from pytube import YouTube
 import pytube
 import pytube.request
 from pytube import Playlist
-from pytube.cli import on_progress
+#from pytube.cli import on_progress
 import shutil
 from random import randint
-from time import sleep
+#from time import sleep
 import subprocess
 from moviepy.video.io.ffmpeg_tools import ffmpeg_extract_subclip
 import win32clipboard  # part of pywin32
 
 
-def convert_single_file_to_mp3(mp4):
+def convert_single_file_to_mp3(mp4, delete_original):
+    """convert a mp4 to mp3
+
+    Args:
+        mp4 (str): url / file 
+        delete_original (boolean): Delete Orignal?
+    """
+    
     if right(mp4, 7) == "mp4.mp4":
         mp3 = left(mp4, (len(mp4) - 7)) + ".mp3"
     else:
@@ -41,7 +48,8 @@ def convert_single_file_to_mp3(mp4):
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
-    os.remove(mp4)
+    if delete_original:
+        os.remove(mp4)
 
 
 def cleanup(test_string):
@@ -222,7 +230,7 @@ def download_file(durl, path_to_save, what, start_time, end_time, convert):
             new_filename = crop_file_video(mp4, start_time, end_time)
 
         if convert:
-            convert_single_file_to_mp3(new_filename)
+            convert_single_file_to_mp3(new_filename, True)
         
 
     elif what == "video":
@@ -286,7 +294,7 @@ def download_playlist(url, path_to_save, what, ask, wait, START):
                         # video.streams.first().download(filename=mp4)       # for music
                         video.streams.get_by_itag(140).download(filename=mp4)
                         new_filename = path_to_save + left(mp4, (len(mp4) - 4)) + ".mp4"
-                        convert_single_file_to_mp3(new_filename)
+                        convert_single_file_to_mp3(new_filename, True)
 
                     elif what == "video":
                         video.streams.get_by_itag(18).download(
@@ -328,7 +336,7 @@ def convert_all_files_in_directory_to_mp3(path):
 
                 mp4 = str(entry.path)
 
-                convert_single_file_to_mp3(mp4)
+                convert_single_file_to_mp3(mp4, True)
                 number_of_files += 1
 
     print(
@@ -384,10 +392,10 @@ def main_download(
 
 
 def main():
-    #what = "video"
-    what = "audio"
-    start_time = None # 11#   None # (2*60)+31 #None # 1.1 # None # 0 # None #144 #198 # None# 5 # None #(0*60)+28 # None #131 # None # 83 #none
-    end_time =  None # (3*60)+5 # None # 234 # None # 424 #  # None #300 #None #(3*60)+42 #311
+    what = "video"
+    #what = "audio"
+    start_time =  None # 11#   None # (2*60)+31 #None # 1.1 # None # 0 # None #144 #198 # None# 5 # None #(0*60)+28 # None #131 # None # 83 #none
+    end_time =    None # 234 # None # 424 #  # None #300 #None #(3*60)+42 #311
     path_to_save = "C:\\Users\\rcxsm\\Music\\MET PYTHON GEDOWNLOAD\\"
     convert = False
 
@@ -438,4 +446,7 @@ def main():
 
 
 if __name__ == "__main__":
+    # mp4 = r"C:\Users\rcxsm\Downloads\Lea Otto - Pachamama coming home.mp4"
+    # convert_single_file_to_mp3(mp4, False)
     main()
+#rlRnweyugW1
