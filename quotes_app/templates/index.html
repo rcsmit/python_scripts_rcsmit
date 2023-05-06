@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Random Quotes</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        font-size: 24px;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        background: linear-gradient({{ gradientAngle }}deg, {{ color1 }}, {{ color2 }});
+      }
+   
+        .quote-text {
+        max-width: 80%;
+        margin: auto;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        align-self: center;
+        text-align: center;
+        white-space: pre-line;
+      }
+      #button-container {
+        display: flex;
+        flex-direction: row;
+        justify-content: center;
+        align-items: flex-end;
+        width: 100%;
+        height: 100px;
+        margin-bottom: 20px;
+      }
+      #new-quote-btn,
+      #prev-quote-btn {
+        margin: 0 10px;
+      }
+    </style>
+  </head>
+
+
+
+
+  <body>
+    <div class="quote-text"></div>
+    <div id="button-container">
+      <button id="prev-quote-btn" disabled>Swipe left for earlier quotes</button>
+      <button id="new-quote-btn">Swipe right for a new quote</button>
+    </div>
+    <script src="{{ url_for('static', filename='jquery-3.6.4.js') }}"></script>
+    <script>
+      $(document).ready(function() {
+        getNewQuote();
+      });
+
+      var currentQuoteIndex = 0;
+      var quoteHistory = [];
+
+      $('#new-quote-btn').click(function() {
+        currentQuoteIndex++;
+        getNewQuote();
+      });
+
+      $('#prev-quote-btn').click(function() {
+        currentQuoteIndex--;
+        updateQuote();
+      });
+
+      function getNewQuote() {
+        $.ajax({
+          url: '{{ url_for("get_quote") }}',
+          dataType: 'json',
+          success: function(data) {
+            quoteHistory.push(data.quote);
+            updateQuote();
+            updateFont();
+            setRandomBackgroundColor()
+            setRandomBackgroundGradient()
+          }
+        });
+      }
+
+      function updateQuote() {
+            var quote = quoteHistory[currentQuoteIndex];
+            $('.quote-text').text(quote);
+
+            // Calculate font size based on quote length and screen size
+            var screenWidth = window.innerWidth;
+            var baseFontSize = screenWidth > 600 ? 3000 : 1500;
+            var fontSize = Math.min(baseFontSize, baseFontSize * 0.9 / quote.length);
+            $('.quote-text').css('font-size', fontSize + 'px');
+
+            if (currentQuoteIndex === 0) {
+              $('#prev-quote-btn').prop('disabled', true);
+            } else {
+              $('#prev-quote-btn').prop('disabled', false);
+            }
+          }
+          function updateFont() {
+        var fonts = [
+          'Abril Fatface',
+          'Bungee Shade',
+          'Faster One',
+          'Monoton',
+          'Orbitron',
+          'Press Start 2P',
+          'Roboto Mono',
+          'Squada One',
+          'VT323',
+          'Zilla Slab Highlight'
+        ];
+        var fontIndex = Math.floor(Math.random() * fonts.length);
+        var font = fonts[fontIndex];
+        $('head').append('<link href="https://fonts.googleapis.com/css2?family=' + font + '&display=swap" rel="stylesheet">');
+        $('.quote-text').css('font-family', font);
+      }
+      
+      function setRandomBackgroundColor() {
+  var randomColor = '#'+Math.floor(Math.random()*16777215).toString(16);
+  document.body.style.backgroundColor = randomColor;
+}
+
+      function setRandomBackgroundGradient() {
+        var colors = [
+          '#' + Math.floor(Math.random()*16777215).toString(16),
+          '#' + Math.floor(Math.random()*16777215).toString(16)
+        ];
+        var degrees = Math.floor(Math.random() * 360);
+        var gradient = 'linear-gradient('+ degrees + 'deg, ' + colors[0] + ', ' + colors[1] + ')';
+        document.body.style.background = gradient;
+      }
+
+    
+    </script>
+  </body>
+</html>
