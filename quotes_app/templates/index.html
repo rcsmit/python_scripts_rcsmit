@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html>
   <head>
+      
+
     <title>Random Quotes</title>
     <style>
       body {
@@ -13,7 +15,7 @@
         align-items: center;
         background: linear-gradient({{ gradientAngle }}deg, {{ color1 }}, {{ color2 }});
       }
-   
+
         .quote-text {
         max-width: 80%;
         margin: auto;
@@ -44,19 +46,40 @@
 
 
   <body>
-    <div class="quote-text"></div>
-    <div id="button-container">
-      <button id="prev-quote-btn" disabled>Swipe left for earlier quotes</button>
-      <button id="new-quote-btn">Swipe right for a new quote</button>
+    <div id="swipe-container">
+        <div class="quote-text"></div>
+        <!-- <div id="button-container">
+            <button id="prev-quote-btn" disabled>Swipe left for earlier quotes</button>
+            <button id="new-quote-btn">Swipe right for a new quote</button>
+        </div> -->
+
     </div>
+    <script src="https://hammerjs.github.io/dist/hammer.min.js"></script>
     <script src="{{ url_for('static', filename='jquery-3.6.4.js') }}"></script>
     <script>
+        var swipeContainer = document.getElementById('swipe-container');
+        var hammer = new Hammer(swipeContainer);
+        var currentQuoteIndex = 0;
+        var quoteHistory = [];
+      
+        hammer.on('swipeleft', function() {
+              // handle swipe left
+              currentQuoteIndex--;
+              updateQuote();
+            });
+
+        hammer.on('swiperight', function() {
+              // handle swipe right
+                currentQuoteIndex++;
+                getNewQuote();
+                
+            });
+            
       $(document).ready(function() {
         getNewQuote();
       });
 
-      var currentQuoteIndex = 0;
-      var quoteHistory = [];
+      
 
       $('#new-quote-btn').click(function() {
         currentQuoteIndex++;
@@ -82,7 +105,7 @@
         });
       }
 
-      function updateQuote() {
+        function updateQuote() {
             var quote = quoteHistory[currentQuoteIndex];
             $('.quote-text').text(quote);
 
@@ -116,7 +139,7 @@
         $('head').append('<link href="https://fonts.googleapis.com/css2?family=' + font + '&display=swap" rel="stylesheet">');
         $('.quote-text').css('font-family', font);
       }
-      
+
       function setRandomBackgroundColor() {
   var randomColor = '#'+Math.floor(Math.random()*16777215).toString(16);
   document.body.style.backgroundColor = randomColor;
@@ -132,7 +155,7 @@
         document.body.style.background = gradient;
       }
 
-    
+
     </script>
   </body>
 </html>

@@ -176,12 +176,11 @@ def index_incl_subdir(dir_name):
                     print (f"Inserted {file}")
             
 def check_if_image_is_in_database(unknown_image):
-    #unknown_image = r"C:\Users\rcxsm\Pictures\div\mijn autos\b\dls\test\FB_IMG_1601671543561.jpg"
     unknown_image = face_recognition.load_image_file(unknown_image)
   
     sl.register_converter("json", convert_JSON_to_list)
 
-    dir_name_db = 'C:\\Users\\rcxsm\\Pictures\\div\\mijn autos\\b\\dls\\'
+    dir_name_db = 'C:\\Users\\rcxsm\\Pictures\\div\\'
     file_name_db = "face_encodings.db"
     db_name = dir_name_db + os.sep +  file_name_db 
     con = sl.connect(db_name, detect_types=sl.PARSE_DECLTYPES)
@@ -249,21 +248,16 @@ def read_incl_subdir(known_image, test_dir, target_dir):
 def main():
     s1 = int(time.time())
     # known_image = r"C:\Users\rcxsm\Downloads\Gal_Gadot_by_Gage_Skidmore_4_600.jpg"
-    # unknown_image = r"C:\Users\rcxsm\Downloads\Gal_Gadot_by_Gage_Skidmore_4_600.jpg"
-    # #unknown_image = r"C:\Users\rcxsm\Pictures\div\mijn autos\b\dls\2022c\galtarget\galgadot288894924_5004577896306415_2863837502072475677_n.jpg"
     # test_dir = r"C:\Users\rcxsm\Pictures\div\galtest"
     # target_dir = r"C:\Users\rcxsm\Pictures\div\\galtarget"
     # result = indentify_faces(known_image, unknown_image)
-    # "C:\Users\rcxsm\Pictures\div\mijn autos\b\dls\2022d"
+    
     # print (result)
     known_image = (
-        r"C:\Users\rcxsm\Downloads\291244330_3298200887131670_7768514897236670639_n.jpg"
+        r"C:\Users\rcxsm\Downloads\known.jpg"
     )
-    unknown_image = r"C:\Users\rcxsm\Downloads\avatars-000500544273-6kcyh0-t500x500.jpg"
-    # unknown_image = r"C:\Users\rcxsm\Downloads\taylorswift2.jpg"
-    # unknown_image = r"C:\Users\rcxsm\Downloads\71b5r4VzGTL._AC_SY450_.jpg"
-    # known_image = r"C:\Users\rcxsm\Downloads\GettyImages-1179298988.jpg"
-
+    unknown_image = r"C:\Users\rcxsm\Downloads\unknown.jpg"
+  
     mode = "index_subdirs"
     mode = "check_if_in_database"
     if mode == "show_distance":
@@ -275,37 +269,23 @@ def main():
 
         print(f"Distance: {distance} -  {result}")
     elif mode == "look_for_my_friend":
-        known_image = r"C:\Users\rcxsm\Pictures\div\mijn autos\b\dls\2022c\rachel_lewins\190378998_10160208309133514_3407449812052869166_n.jpg"
-        target_dir = r"C:\Users\rcxsm\Pictures\div\mijn autos\b\dls\2022c\rachel_lewins"
+        known_image = r"C:\Users\rcxsm\Pictures\div\known.jpg"
+        target_dir = r"C:\Users\rcxsm\Pictures\div\target_dir\"
         test_dir_ = [
-           # r"C:\Users\rcxsm\Pictures\div\mijn autos\b\dls\2020",
-
-           
-            r"C:\Users\rcxsm\Pictures\div\mijn autos\b\dls\2020f",
-            r"C:\Users\rcxsm\Pictures\div\mijn autos\b\dls\2020g",
-            r"C:\Users\rcxsm\Pictures\div\mijn autos\b\dls\2021",
-            r"C:\Users\rcxsm\Pictures\div\mijn autos\b\dls\2022a",
-            r"C:\Users\rcxsm\Pictures\div\mijn autos\b\dls\2022b",
-            r"C:\Users\rcxsm\Pictures\div\mijn autos\b\dls\2022c",
+         
+            r"C:\Users\rcxsm\Pictures\div\test_dir",
         ]
         for test_dir in test_dir_:
             read_incl_subdir(known_image, test_dir, target_dir)
     elif mode == "index_subdirs":
         test_dir_ = [
-          #  r"C:\Users\rcxsm\Pictures\div\mijn autos\b\dls\2020",
-            r"C:\Users\rcxsm\Pictures\div\mijn autos\b\dls\test",
-            # r"C:\Users\rcxsm\Pictures\div\mijn autos\b\dls\2020f",
-            # r"C:\Users\rcxsm\Pictures\div\mijn autos\b\dls\2020g",
-            # r"C:\Users\rcxsm\Pictures\div\mijn autos\b\dls\2021",
-            # r"C:\Users\rcxsm\Pictures\div\mijn autos\b\dls\2022a",
-            # r"C:\Users\rcxsm\Pictures\div\mijn autos\b\dls\2022b",
-            # r"C:\Users\rcxsm\Pictures\div\mijn autos\b\dls\2022c",
-        ]
+         
+            r"C:\Users\rcxsm\Pictures\div\test_dir",
+          
         for test_dir in test_dir_:
             index_incl_subdir(test_dir)
     elif mode == "check_if_in_database":
-        #image_to_check = r"C:\Users\rcxsm\Pictures\div\mijn autos\b\dls\test\FB_IMG_1601671543561.jpg"
-        image_to_check = r"C:\Users\rcxsm\Pictures\div\mijn autos\b\dls\2022c\rachel_lewins\190378998_10160208309133514_3407449812052869166_n.jpg"
+        image_to_check = r"C:\Users\rcxsm\Pictures\div\check_whether_in_database.jpg"
        
         result = check_if_image_is_in_database(image_to_check)
         if result == True:
