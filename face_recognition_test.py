@@ -124,6 +124,11 @@ def show_distance(known_image, unknown_image):
     return a[0]
 
 def index_incl_subdir(dir_name):
+    """Makes a SQlite-database  with indexes of faces in a directory (incl subdirectory)
+
+    Args:
+        dir_name (str): the directory name to index
+    """    
     dir_name_db = r"C:\Users\rcxsm\Pictures\div\mijn autos\b\dls"
     file_name_db = "face_encodings.db"
     db_name = dir_name_db + os.sep +  file_name_db 
@@ -146,6 +151,22 @@ def index_incl_subdir(dir_name):
         print ("Table exists already")
     #sl.register_adapter(np.ndarray, adapt_array)
 
+
+    # SQLite has no facility for a 'nested' column; you'd have to store your 
+    # list as text or binary data blob; serialise it on the way in, deserialise 
+    # it again on the way out.
+
+    # How you serialise to text or binary data depends on your use-cases.
+    #  JSON (via the json module) could be suitable if your lists and 
+    # dictionaries consist only of text, numbers, booleans and None 
+    # (with the dictionaries only using strings as keys). JSON is 
+    # supported by a wide range of other languages, so you keep your 
+    # data reasonably compatible. Or you could use pickle, which lets 
+    # you serialise to a binary format and can handle just about anything 
+    # Python can throw at it, but it's specific to Python.
+
+    # You can then register an adapter to handle converting between 
+    # the serialisation format and Python lists:
     sl.register_adapter(list, adapt_list_to_JSON)
     sl.register_converter("json", convert_JSON_to_list)
   
@@ -176,6 +197,15 @@ def index_incl_subdir(dir_name):
                     print (f"Inserted {file}")
             
 def check_if_image_is_in_database(unknown_image):
+    """Checks if an image is in the SQlite database
+
+    Args:
+        unknown_image (str): url of the image to test
+
+    Returns:
+        bool: TRUE when in database 
+    """
+
     unknown_image = face_recognition.load_image_file(unknown_image)
   
     sl.register_converter("json", convert_JSON_to_list)
@@ -254,12 +284,13 @@ def main():
     
     # print (result)
     known_image = (
-        r"C:\Users\rcxsm\Downloads\known.jpg"
+        r"C:\Users\rcxsm\Downloads\adar2.jpg"
     )
-    unknown_image = r"C:\Users\rcxsm\Downloads\unknown.jpg"
+    unknown_image = r"C:\Users\rcxsm\Downloads\adar3.jpg"
   
     mode = "index_subdirs"
     mode = "check_if_in_database"
+    mode = "show_distance"
     if mode == "show_distance":
 
         show_face_landmarks(known_image)
@@ -269,18 +300,13 @@ def main():
 
         print(f"Distance: {distance} -  {result}")
     elif mode == "look_for_my_friend":
-        known_image = r"C:\Users\rcxsm\Pictures\div\known.jpg"
-        target_dir = r"C:\Users\rcxsm\Pictures\div\target_dir\"
-        test_dir_ = [
-         
-            r"C:\Users\rcxsm\Pictures\div\test_dir",
-        ]
+        # known_image = r"C:\Users\rcxsm\Pictures\div\known.jpg"
+        # target_dir = r"C:\Users\rcxsm\Pictures\div\target_dir\"
+        test_dir_ = [r"C:\Users\rcxsm\Pictures\div\test_dir"]
         for test_dir in test_dir_:
             read_incl_subdir(known_image, test_dir, target_dir)
     elif mode == "index_subdirs":
-        test_dir_ = [
-         
-            r"C:\Users\rcxsm\Pictures\div\test_dir",
+        test_dir_ = [r"C:\Users\rcxsm\Pictures\div\test_dir",]
           
         for test_dir in test_dir_:
             index_incl_subdir(test_dir)
@@ -297,7 +323,7 @@ def main():
         print("ERROR in /mode/")
     s2 = int(time.time())
     s2x = s2 - s1
-    print("Downloading  took " + str(s2x) + " seconds ....")
+    print("Processing  took " + str(s2x) + " seconds ....")
 
 
 
