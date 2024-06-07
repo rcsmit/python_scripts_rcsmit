@@ -19,7 +19,7 @@ import pytesseract
 import os
 import time
 import sqlite3 as sl
-import pandas as pd
+
 
 def convert_txt_to_ocr(file_name):
     """Really recognize the text in the image to text
@@ -52,6 +52,7 @@ def txt_to_ocr(dir_name, item, extensionsToCheck):
                 return text
             else:
                 print(f"No text found in {file_name}")
+           
 
 
 def save_text(text, filename, modus, dir_name, rootdir):
@@ -136,17 +137,23 @@ def delete_records_from_db(db_dir, dir, file_name_db ):
     con.commit()
     print (f" DONE {sql_statement}")
 
-def read_incl_subdir(action, dir_name, extensionsToCheck, modus, con):
+def read_incl_subdir(action, dir_name, extensionsToCheck, file_name_contains, modus, con):
     rootdir = dir_name
     for subdir, dirs, files in os.walk(dir_name):
         f = len(files)
+        print (subdir)
         for idx, file in enumerate(files):
-            print(f"{subdir =}")
-            print(f"{idx}/{f} - {file =}")
-            text = txt_to_ocr(subdir, file, extensionsToCheck)
-            take_action_with_text(subdir, modus, action, text, file,rootdir, con)
+        
+            if file_name_contains != None:
+                print (file)
+                if file_name_contains in file:
+                    print(f"{subdir =}")
+                    print(f"{idx}/{f} - {file =}")
+                    text = txt_to_ocr(subdir, file, extensionsToCheck)
+                    take_action_with_text(subdir, modus, action, text, file,rootdir, con)
 
-def read_single_dir(action, dir_name, extensionsToCheck, modus, con):
+def read_single_dir(action, dir_name, extensionsToCheck, file_name_contains, modus, con):
+    print ("read single dir")
     rootdir = dir_name
     print(f"Browsing {dir_name}")
     lengte = len(os.listdir(dir_name))
@@ -154,14 +161,23 @@ def read_single_dir(action, dir_name, extensionsToCheck, modus, con):
     os.chdir(dir_name)  # change directory from working dir to dir with files
 
     for file in os.listdir(dir_name):  # loop through items in dir
-        print(f"{n}/{lengte}")
-        text = txt_to_ocr(dir_name, file, extensionsToCheck)
-        take_action_with_text(dir_name, modus, action, text, file,rootdir,con)
-        n = n + 1
+        print (file)
+        if file_name_contains != None:
+            if file_name_contains in file:
+                print(f"{n}/{lengte}")
+                text = txt_to_ocr(dir_name, file, extensionsToCheck)
+                take_action_with_text(dir_name, modus, action, text, file,rootdir,con)
+                n = n + 1
+        else:
+            print(f"{n}/{lengte}")
+            text = txt_to_ocr(dir_name, file, extensionsToCheck)
+            take_action_with_text(dir_name, modus, action, text, file,rootdir,con)
+            n = n + 1
 
 
 
-def do_action(action, dir_name, dir_name_db,  file_name_db, extensionsToCheck, modus, to_do):
+
+def do_action(action, dir_name, dir_name_db,  file_name_db, extensionsToCheck, file_name_contains, modus, to_do):
     if action == "delete_dir_from_db":
         delete_records_from_db(dir_name_db, dir_name, file_name_db )
     elif action == "save_to_database":
@@ -185,10 +201,10 @@ def do_action(action, dir_name, dir_name_db,  file_name_db, extensionsToCheck, m
     s1 = int(time.time())
 
     if to_do == "single_directory":
-        read_single_dir(action, dir_name, extensionsToCheck, modus, con)
+        read_single_dir(action, dir_name, extensionsToCheck, file_name_contains, modus, con)
 
     elif to_do == "including_subdirectories":
-        read_incl_subdir(action, dir_name, extensionsToCheck, modus, con)
+        read_incl_subdir(action, dir_name, extensionsToCheck,file_name_contains, modus, con)
     else:
         print("ERROR IN 'to_do' variable")
 
@@ -205,16 +221,18 @@ def main():
     #dir_name_db = r"C:\Users\rcxsm\Downloads\Sheetmusic\sheetmusic\gefotografeerd"
     ################################################################################
     
-    action = "save_to_database" #"save_to_txt_file" #"save_to_database" # "delete_dir_from_db"
-    dir_name = r"C:\Users\rcxsm\Pictures\div\mijn autos\b\dls\tinder2022"
-    dir_name_db = r"C:\Users\rcxsm\Pictures\div\mijn autos\b"
+    action =  "save_to_database" # "save_to_txt_file" #"save_to_database" # "delete_dir_from_db"
+    #dir_name = r"C:\Users\rcxsm\Pictures\div\mijn autos\b\dls\tinder2022"
+    dir_name = "C:\\Users\\rcxsm\\Pictures\\div\\mijn autos\\b\\dls\\tinder_bumble"
+    dir_name_db = "C:\\Users\\rcxsm\\Pictures\\div\\mijn autos\\b\\dls\\tinder_bumble"
+    #dir_name_db = r"C:\Users\rcxsm\Pictures\div\mijn autos\b"
     file_name_db = "my_test.db"
 
     extensionsToCheck = [".jpg", ".JPG", ".jpeg", ".png", ".PNG"]
     modus = "new"  # "append"  # 'new' to place text in seperate textfiles, ' append' to put all text in one file
-    to_do = "including_subdirectories"#  "single_directory" #"including_subdirectories"
-   
-    do_action(action, dir_name, dir_name_db, file_name_db, extensionsToCheck, modus, to_do)
+    to_do =  "single_directory" # "including_subdirectories"#  #"including_subdirectories"
+    file_name_contains = None # "Instagram"
+    do_action(action, dir_name, dir_name_db, file_name_db, extensionsToCheck,file_name_contains, modus, to_do)
 
 if __name__ == "__main__":
     main()

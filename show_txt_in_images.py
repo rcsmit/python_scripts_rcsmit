@@ -63,10 +63,57 @@ def read_db(filter_file_name, filter_keyword, db_name):
     else:
         st.write("Too much results to show the images")
 
+def read_db_all_txt(filter_file_name, filter_keyword, db_name):
+    """Search the database for a certain keyword and/or directory
+    """    
+    # Specify the file name and the mode ('w' for write)
+    file = open("C:\\Users\\rcxsm\\Pictures\\div\\mijn autos\\b\\dls\\tinder_bumble\\example.txt", "w")
+    st.write("Starting to write")
+    
+  
+    #TODO implement filter for directory
+    sql_statement = f" SELECT directory || '\\' || filename AS complete_path, text_in_image FROM txt_from_images "
+    if filter_keyword is not None and filter_file_name is not None:
+        sql_statement = sql_statement + f"WHERE  (text_in_image LIKE '%{filter_keyword}%' AND complete_path LIKE '%{filter_file_name}%' )"
+    elif filter_keyword is  None and filter_file_name is not None:
+        sql_statement = sql_statement + f"WHERE  (complete_path LIKE '%{filter_file_name}%' )"
+    elif filter_keyword is not None and filter_file_name is  None:
+        sql_statement = sql_statement + f"WHERE  (text_in_image LIKE '%{filter_keyword}%' )"
+    try:
+        con = sl.connect(db_name)
+    except:
+        st.error("Error reading the database. Is the filename right and/or did you use forbidden characters ?")
+        st.stop()
+    try:
+    #if 1 ==1 :
+        df = pd.read_sql(sql_statement, con)
+        if len(df)== 0:
+            st.warning("No items found")
+        else:
+            st.write(f"{len(df)} items found")
+            st.dataframe(data=df, width=900, height=None)
+
+            for index, row in df.iterrows():    
+                url = (f"{row['complete_path']}")
+                text=  row['text_in_image']
+                text= text.replace(filter_keyword, "**"+ filter_keyword +"**")
+                #st.write(text)
+                # Write text to the file
+                file.write(text)
+            # Close the file to ensure data is saved
+            file.close()
+            st.write("ready")
+    except:
+        st.error("Error reading the data. Did you use forbidden characters ?")
+        st.stop()
+
+
 def main():
     action = "show"
 
     database_file_name_=r"C:\Users\rcxsm\Pictures\div\mijn autos\b\my_test.db" # r"C:\Users\rcxsm\Downloads\Sheetmusic\sheetmusic\gefotografeerd\my_test.db"
+    
+    database_file_name_="C:\\Users\\rcxsm\\Pictures\\div\\mijn autos\\b\\dls\\tinder_bumble\\my_test.db"
     if action == "show":
         col1,col2,col3 = st.columns(3)
         with col1:
@@ -76,7 +123,8 @@ def main():
         with col3:
             database_file_name = st.text_input("Database file_name", database_file_name_)
             
-        read_db(filter_file_name, filter_text, database_file_name)
+        #read_db(filter_file_name, filter_text, database_file_name)
+        read_db_all_txt(filter_file_name, filter_text, database_file_name)
     elif action == "delete":
         # delete records from a specific directory
         dir =  r"C:\Users\rcxsm\Pictures\ocr_test"
