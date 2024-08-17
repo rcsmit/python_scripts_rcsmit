@@ -267,10 +267,10 @@ def download_file(durl, path_to_save, what, start_time, end_time, convert):
 
     pytube.request.default_range_size = int(1048576 / 1)  # 9437184
     _filename = title
-
     mp4 = f"{_filename}.mp4"
+    mp3 = f"{_filename}.mp3"
 
-    if os.path.isfile(mp4):
+    if os.path.isfile(mp4) or os.path.isfile(mp3):
         print(f"File [{mp4}] exist already. I stop")
         return
 
@@ -463,10 +463,10 @@ def main():
     """_summary_
     """
 
-    # what = "video"
+    #what = "video"
     what = "audio"
-    start_time = None# 45  # (1*60)+54 #None # 1.1 # None # 0 # None #144 #198 # None# 5 # None #(0*60)+28 # None #131 # None # 83 #none
-    end_time = None#(5 * 60) + 13  # None  #    #311
+    start_time = None # 9 # None # 12 # None# 45  # (1*60)+54 #None # 1.1 # None # 0 # None #144 #198 # None# 5 # None #(0*60)+28 # None #131 # None # 83 #none
+    end_time = None # (3 * 60) + 0  # None  #    #311
     path_to_save = r"C:\\Users\\rcxsm\\Music\\MET PYTHON GEDOWNLOAD\\"
     convert = True
     ask = False  # ask if you want to download each file
@@ -528,7 +528,8 @@ def add_pretext(directory):
 
 if __name__ == "__main__":
     # mp4 = r"C:\Users\rcxsm\Downloads\Lea Otto - Pachamama coming home.mp4"
-    # convert_single_file_to_mp3(mp4, False)
+    mp4=r"C:\Users\rcxsm\Music\MET PYTHON GEDOWNLOAD\TAYLOR SWIFT ERAS TOUR Full Show Front Row Live in Edinburgh & Liverpool 7 & 14 June 2024.mp4"
+    #convert_single_file_to_mp3(mp4, False)
     main()
     
     #directory = "C:\\Users\\rcxsm\\Music\\MET PYTHON GEDOWNLOAD\\ttpd\\" 
