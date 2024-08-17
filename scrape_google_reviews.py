@@ -7,15 +7,14 @@ import asyncio
 import json
 import pandas as pd
 from playwright.async_api import async_playwright
-
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
-
 
 from os import path
 from wordcloud import WordCloud, STOPWORDS
 import matplotlib.pyplot as plt
 import random
+
 def read_json_as_dataframe(file_path):
     """
     Reads a JSON file from the given path and returns it as a pandas DataFrame.
@@ -35,7 +34,6 @@ def read_json_as_dataframe(file_path):
     # Convert the list of JSON objects to a DataFrame
     df = pd.DataFrame(data)
     return df
-
 
 async def check_json(response, output_path):
     """ This function is triggered when we get a response from the
@@ -89,7 +87,6 @@ async def check_json(response, output_path):
                 # Write the new data to the JSON file
                 with open(output_path, 'a', encoding='utf-8') as file:
                     file.write(new_data_json + '\n')
-
 
 async def main_google_reviews(search_input):
     """ This is the main function to scrape Google Reviews """
@@ -168,9 +165,6 @@ async def main_google_reviews(search_input):
     # remove json file
     # os.remove(path)
 
-
-
-
 # Function to convert the timestamp to the correct date
 def convert_timestamp_to_date(timestamp):
     """
@@ -187,7 +181,7 @@ def convert_timestamp_to_date(timestamp):
     now = datetime.now() 
 
     if 'un anno fa' in timestamp:
-        # Extract the number of years and determine the date as January 1st of that year
+        # Extract the number of years (1) and subtract it from the current date
         years_ago = 1
         date = now - relativedelta(years=years_ago)
 
@@ -206,11 +200,24 @@ def convert_timestamp_to_date(timestamp):
     
     return date
 
-
-
 def grey_color_func(word, font_size, position, orientation, random_state=None,
                     **kwargs):
+    """
+    Generates a color for a word based on its position and font size, using a grey scale.
+
+    Args:
+        word (str): The word to be colored.
+        font_size (int): The font size of the word.
+        position (tuple): The (x, y) position of the word in the visualization.
+        orientation (str): The orientation of the word (e.g., horizontal, vertical).
+        random_state (int, optional): Seed for the random number generator (default is None).
+        **kwargs: Additional keyword arguments.
+
+    Returns:
+        str: A color in HSL (Hue, Saturation, Lightness) format with varying lightness for grey scale.
+    """
     return "hsl(33, 73%%, %d%%)" % random.randint(60, 100)
+
 def wordcloud(df):
     """
     Reads the text in column 'review' where the language is 'en' and makes a wordcloud of it
@@ -249,7 +256,6 @@ def wordcloud(df):
     f.write(wordcloud_svg )
     f.close()
     plt.axis("off")
-   
     plt.show()
     
 def update_column_names(df):
@@ -282,8 +288,6 @@ def calculate_ratings_and_averages_per_period(df, index_column):
         pd.DataFrame: A DataFrame containing the number of ratings and the average rating per year.
     """
 
-   
-
     # Calculate the number of ratings per year
     ratings_per_period = df.groupby(index_column)['rating'].count().reset_index().rename(columns={'rating': 'number_of_ratings'})
     
@@ -298,7 +302,6 @@ def calculate_ratings_and_averages_per_period(df, index_column):
     print(f"Combined ratings and averages per {index_column}:")
     print(combined_table)
     
-   
 def calculate_rating_distribution(df, index_column):
     """
     Calculates the distribution of ratings (absolute counts and percentages) per year and prints the results.
@@ -330,8 +333,6 @@ def calculate_rating_distribution(df, index_column):
     print(f"Ratings distributions, absolute and percentage, per {index_column}:")
     print(combined_table)
 
-
-
 def analyse(path):
     """
     Performs a comprehensive analysis of the data at the given path and prints various metrics.
@@ -346,6 +347,7 @@ def analyse(path):
     df['date'] = df['timestamp'].apply(convert_timestamp_to_date)
     df['year'] = df['date'].dt.year
     df['month'] = df['date'].dt.to_period('M')
+    print (df)
     calculate_ratings_and_averages_per_period(df, 'year')
     calculate_rating_distribution(df, 'year')
 
@@ -354,14 +356,18 @@ def analyse(path):
     calculate_rating_distribution(df, 'month')
     wordcloud(df)
 
-if __name__ == '__main__':
+def main():
+    #RETRIEVE
     # SEARCH_INPUT = "Goodsouls Kitchen - Vegan Restaurant"
     SEARCH_INPUT = "Kia Ora Café"
     
     #asyncio.run(main_google_reviews(SEARCH_INPUT))
     
+    # ANALYSE
     #path = f"reviews_google_{SEARCH_INPUT}.json"
     path = "reviews_google_goodsouls_kitchen.json"
     #path = "reviews_google_Kia Ora Café.json"
     analyse(path)
     
+if __name__ == '__main__':
+    main()
