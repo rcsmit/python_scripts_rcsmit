@@ -105,10 +105,8 @@ async def main_google_reviews(search_input):
     url = (
         "https://www.google.com/maps/@9.7563241,99.9631365,16z?entry=ttu")
 
-
     # file path
     path = f"reviews_google_{search_input}.json"
-
 
     async with async_playwright() as pw:
         # creates an instance of the Chromium browser and launches it
@@ -254,72 +252,85 @@ def wordcloud(df):
    
     plt.show()
     
-def calculate_ratings_per_year(df):
+def update_column_names(df):
     """
-    Calculates the number of ratings per year and prints the result.
+    Updates column names by replacing 'x' with 'abs' and 'y' with 'perc'.
+    
+    Args:
+        df (pd.DataFrame): The DataFrame whose column names need to be updated.
+    
+    Returns:
+        pd.DataFrame: The DataFrame with updated column names.
+    """
+    # Create a dictionary for renaming columns
+    rename_dict = {col: col.replace('x', 'abs').replace('y', 'perc') for col in df.columns}
+    
+    # Rename the columns
+    df = df.rename(columns=rename_dict)
+    
+    return df
+
+def calculate_ratings_and_averages_per_period(df, index_column):
+    """
+    Calculates both the number of ratings per year and the average rating per year,
+    then combines these metrics into a single DataFrame and prints the result.
 
     Args:
-        df (pd.DataFrame): The DataFrame containing the data with a 'year' column.
+        df (pd.DataFrame): The DataFrame containing the data with 'year' and 'rating' columns.
 
     Returns:
-        None
+        pd.DataFrame: A DataFrame containing the number of ratings and the average rating per year.
     """
-    ratings_per_year = df.groupby('year')['rating'].count().reset_index().rename(columns={'rating': 'number_of_ratings'})
-    print("Ratings per year:")
-    print(ratings_per_year)
 
-def calculate_average_rating_by_year(df):
-    """
-    Calculates the average rating per year and prints the result.
+   
 
-    Args:
-        df (pd.DataFrame): The DataFrame containing the data with a 'year' column.
-
-    Returns:
-        None
-    """
-    average_rating_by_year = df.groupby('year')['rating'].mean().round(2).reset_index()
-    print("Average rating by year:")
-    print(average_rating_by_year)
-
-def calculate_rating_distribution(df):
+    # Calculate the number of ratings per year
+    ratings_per_period = df.groupby(index_column)['rating'].count().reset_index().rename(columns={'rating': 'number_of_ratings'})
+    
+    # Calculate the average rating per year
+    average_rating_by_year = df.groupby(index_column)['rating'].mean().round(2).reset_index().rename(columns={'rating': 'average_rating'})
+    
+    # Merge the two results into a single DataFrame
+    combined_table = pd.merge(ratings_per_period, average_rating_by_year, on=index_column)
+    combined_table = update_column_names(combined_table)
+    
+    # Print the result
+    print(f"Combined ratings and averages per {index_column}:")
+    print(combined_table)
+    
+   
+def calculate_rating_distribution(df, index_column):
     """
     Calculates the distribution of ratings (absolute counts and percentages) per year and prints the results.
 
     Args:
         df (pd.DataFrame): The DataFrame containing the data with a 'year' column.
+        index_column : 'year' | 'month'
 
     Returns:
         None
     """
+
     rating_distribution = df.pivot_table(
-        index='year',
+        index=index_column,
         columns='rating',
         aggfunc='size',
         fill_value=0
     )
     rating_distribution = rating_distribution.reindex(columns=[1, 2, 3, 4, 5], fill_value=0)
     rating_distribution_perc = round(rating_distribution.div(rating_distribution.sum(axis=1), axis=0) * 100, 2)
-    print("Rating distribution (absolute counts):")
-    print(rating_distribution)
-    print("Rating distribution (percentages):")
-    print(rating_distribution_perc)
+    
+    # Add a 'total' column with the sum of ratings for each row
+    rating_distribution['total'] = rating_distribution.sum(axis=1)
 
-def calculate_average_rating_last_12_months(df):
-    """
-    Calculates the average rating by month for the last 12 months and prints the result.
+    combined_table = pd.merge(rating_distribution, rating_distribution_perc, on=index_column)
+    combined_table = update_column_names(combined_table)
+    
+    # Print the result
+    print(f"Ratings distributions, absolute and percentage, per {index_column}:")
+    print(combined_table)
 
-    Args:
-        df (pd.DataFrame): The DataFrame containing the data with a 'date' column.
 
-    Returns:
-        None
-    """
-    last_12_months = df[df['date'] >= (datetime.now() - relativedelta(months=12))]
-    last_12_months['month'] = last_12_months['date'].dt.to_period('M')
-    average_rating_by_month = last_12_months.groupby('month')['rating'].mean().round(2).reset_index()
-    print("Average rating by month (last 12 months):")
-    print(average_rating_by_month)
 
 def analyse(path):
     """
@@ -334,12 +345,15 @@ def analyse(path):
     df = read_json_as_dataframe(path)
     df['date'] = df['timestamp'].apply(convert_timestamp_to_date)
     df['year'] = df['date'].dt.year
+    df['month'] = df['date'].dt.to_period('M')
+    calculate_ratings_and_averages_per_period(df, 'year')
+    calculate_rating_distribution(df, 'year')
 
-    calculate_ratings_per_year(df)
-    calculate_average_rating_by_year(df)
-    calculate_rating_distribution(df)
-    calculate_average_rating_last_12_months(df)
+    df = df[df['date'] >= (datetime.now() - relativedelta(months=12))].copy()
+    calculate_ratings_and_averages_per_period(df, 'month')
+    calculate_rating_distribution(df, 'month')
     wordcloud(df)
+
 if __name__ == '__main__':
     # SEARCH_INPUT = "Goodsouls Kitchen - Vegan Restaurant"
     SEARCH_INPUT = "Kia Ora Café"
