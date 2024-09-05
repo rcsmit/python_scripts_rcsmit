@@ -15,6 +15,8 @@ from wordcloud import WordCloud, STOPWORDS
 import matplotlib.pyplot as plt
 import random
 
+timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+
 def read_json_as_dataframe(file_path):
     """
     Reads a JSON file from the given path and returns it as a pandas DataFrame.
@@ -48,6 +50,7 @@ async def check_json(response, output_path):
         data_raw = json.loads(content)
         data_raw = data_raw[2]
 
+
         def safe_extract(data, *path, default=None):
             try:
                 for key in path:
@@ -59,7 +62,7 @@ async def check_json(response, output_path):
         for i, element in enumerate(data_raw):
             timestamp = data_raw[i][0][1][6]
             # if 'year' not in timestamp and 'years' not in timestamp:
-        
+            print (data_raw)
             data = {
                 'review': safe_extract(
                     data_raw, i, 0, 2, 15, 0, 0),
@@ -72,7 +75,9 @@ async def check_json(response, output_path):
                 'language': safe_extract(
                     data_raw, i, 0, 2, 14, 0),
             }
-            print (data)
+            #               i
+            # time stap 0 > 0 > 0 > 1 > 6
+
             # Load existing data into a set to avoid duplicates
             existing_data = set()
             if os.path.exists(output_path):
@@ -103,7 +108,7 @@ async def main_google_reviews(search_input):
         "https://www.google.com/maps/@9.7563241,99.9631365,16z?entry=ttu")
 
     # file path
-    path = f"reviews_google_{search_input}.json"
+    path = f"reviews_google_{search_input}__{timestamp}.json"
 
     async with async_playwright() as pw:
         # creates an instance of the Chromium browser and launches it
@@ -134,34 +139,43 @@ async def main_google_reviews(search_input):
         # get tab with the reviews
         #await page.locator("text='Reviews'").first.click()
         await page.locator("text='Recensioni'").first.click()
-
+        time.sleep(1)
+        await page.mouse.wheel(0, 35000)
+        time.sleep(1)
         # search for most recent
         #await page.locator("text='Sort'").first.click()
         await page.locator("text='Ordina'").first.click()
         
         time.sleep(1)
+        #await page.locator("text='Valutazione più bassa'").first.click()
         
-        await page.keyboard.press('ArrowDown')
+        await page.keyboard.press('ArrowDown') # newest
+        time.sleep(1)
+        await page.keyboard.press('ArrowDown') #highest rating
+        time.sleep(1)
+        await page.keyboard.press('ArrowDown') #lowest rating
+        
         time.sleep(1)
         
         await page.keyboard.press('Enter')
-
-        for i in range(200):
+        time.sleep(1)
+        n=4
+        for i in range(n):
             await page.mouse.wheel(0, 35000)
             # get a response
             page.on(
                 "response",
                 lambda response: asyncio.create_task(
                     check_json(response, path)))
-            print(f'{i+1}/200 scrolling')
+            print(f'{i+1}/{n} scrolling')
             time.sleep(1)
 
         # save to a csv file
         df = read_json_as_dataframe(path)
         df.to_csv(f'data/reviews_{search_input}.csv', index=False)
-
+        time.sleep(1)
         await page.close(run_before_unload=True)
-
+        time.sleep(1)
     # remove json file
     # os.remove(path)
 
@@ -189,6 +203,14 @@ def convert_timestamp_to_date(timestamp):
         # Extract the number of years and subtract it from the current date
         years_ago = int(timestamp.split()[0])
         date = now - relativedelta(years=years_ago)
+    elif 'settimane fa' in timestamp :
+        # Extract the number of months and subtract it from the current date
+        weeks_ago = int(timestamp.split()[0])
+        date = now - relativedelta(weeks=weeks_ago)
+    elif  'settimana fa' in timestamp:
+        # Extract the number of months and subtract it from the current date
+        weeks_ago = 1
+        date = now - relativedelta(weeks=weeks_ago)
 
     elif 'mese fa' in timestamp or 'mesi fa' in timestamp:
         # Extract the number of months and subtract it from the current date
@@ -351,7 +373,7 @@ def analyse(path):
     calculate_ratings_and_averages_per_period(df, 'year')
     calculate_rating_distribution(df, 'year')
 
-    df = df[df['date'] >= (datetime.now() - relativedelta(months=12))].copy()
+    #df = df[df['date'] >= (datetime.now() - relativedelta(months=12))].copy()
     calculate_ratings_and_averages_per_period(df, 'month')
     calculate_rating_distribution(df, 'month')
     wordcloud(df)
@@ -360,13 +382,18 @@ def main():
     #RETRIEVE
     # SEARCH_INPUT = "Goodsouls Kitchen - Vegan Restaurant"
     SEARCH_INPUT = "Kia Ora Café"
+    SEARCH_INPUT = "Gummy Bear Restaurant Thai food and Vegan food"
     
-    #asyncio.run(main_google_reviews(SEARCH_INPUT))
+    asyncio.run(main_google_reviews(SEARCH_INPUT))
     
     # ANALYSE
     #path = f"reviews_google_{SEARCH_INPUT}.json"
-    path = "reviews_google_goodsouls_kitchen.json"
-    #path = "reviews_google_Kia Ora Café.json"
+
+    #path = f"reviews_google_goodsouls_kitchen_{timestamp}.json"
+    #path = f"reviews_google_Kia Ora Café_{timestamp}.json"
+    path = f"reviews_google_{SEARCH_INPUT}_{timestamp}.json"
+    path = "reviews_google_Gummy Bear Restaurant Thai food and Vegan food__20240818_230759.json"
+    # path = "reviews_google_Kia Ora Café__20240818_225641.json"
     analyse(path)
     
 if __name__ == '__main__':
