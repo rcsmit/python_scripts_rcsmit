@@ -5,7 +5,7 @@ from datetime import datetime
 
 
 def read_replacements(wb):
-    sheet_replacements = wb["replacements"]  # Replace with the actual worksheet name
+    sheet_replacements = wb["RULES"]  # Replace with the actual worksheet name
 
 # Create an empty dictionary to store the data
     replacements = []
@@ -30,9 +30,9 @@ def main():
 
     output_file_path = f'backup_{formatted_datetime}.xlsx'  # Replace with your desired output file path
     wb.save(output_file_path)
-
+    print (f"Backup saved as {output_file_path}")
     replacements = read_replacements(wb)
-
+   
     # Insert a new column with row numbers
     sheet.insert_cols(1)
     for row_number, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=1):
@@ -42,16 +42,19 @@ def main():
     for row in sheet.iter_rows(min_row=2, max_row=sheet.max_row, values_only=True):
         # Apply the replacements
         for r in replacements:
+    
             try:
-                if r[1] is None:
+                if r[5] is None:
+                    pass
+
                     # row[12] = income_expenses -> to see if there is already a category
-                    if r[0].lower() in str(row[11]).lower() and row[12] is None:
+                    if r[1].lower() in str(row[11]).lower() and row[12] is None:
                         print(f"{row[11]} x {row[8]}")
                         sheet.cell(row=row[0], column=13, value=r[2])
                         sheet.cell(row=row[0], column=14, value=r[3])
                         sheet.cell(row=row[0], column=15, value=r[4])
                 else:
-                    if r[0].lower() in str(row[11]).lower() and row[12] is None and row[8] == r[1]:
+                    if r[1].lower() in str(row[11]).lower() and row[12] is None and row[8] == r[5]:
                         print(f"{row[11]} x {row[8]}")
                         sheet.cell(row=row[0], column=13, value=r[2])
                         sheet.cell(row=row[0], column=14, value=r[3])

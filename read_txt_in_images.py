@@ -221,15 +221,18 @@ def main():
     #dir_name_db = r"C:\Users\rcxsm\Downloads\Sheetmusic\sheetmusic\gefotografeerd"
     ################################################################################
     
-    action =  "save_to_database" # "save_to_txt_file" #"save_to_database" # "delete_dir_from_db"
+    action =  "save_to_txt_file" # "save_to_database" # "save_to_txt_file" #"save_to_database" # "delete_dir_from_db"
     #dir_name = r"C:\Users\rcxsm\Pictures\div\mijn autos\b\dls\tinder2022"
     dir_name = "C:\\Users\\rcxsm\\Pictures\\div\\mijn autos\\b\\dls\\tinder_bumble"
     dir_name_db = "C:\\Users\\rcxsm\\Pictures\\div\\mijn autos\\b\\dls\\tinder_bumble"
+    dir_name= r"C:\Users\rcxsm\Documents\tindertext"
+    dir_name_db = r"C:\Users\rcxsm\Documents\tindertext"
+    
     #dir_name_db = r"C:\Users\rcxsm\Pictures\div\mijn autos\b"
     file_name_db = "my_test.db"
 
     extensionsToCheck = [".jpg", ".JPG", ".jpeg", ".png", ".PNG"]
-    modus = "new"  # "append"  # 'new' to place text in seperate textfiles, ' append' to put all text in one file
+    modus = "append" # "new"  # "append"  # 'new' to place text in seperate textfiles, ' append' to put all text in one file
     to_do =  "single_directory" # "including_subdirectories"#  #"including_subdirectories"
     file_name_contains = None # "Instagram"
     do_action(action, dir_name, dir_name_db, file_name_db, extensionsToCheck,file_name_contains, modus, to_do)
