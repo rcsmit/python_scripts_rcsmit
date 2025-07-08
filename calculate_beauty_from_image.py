@@ -562,8 +562,8 @@ def main():
         img_in15=r"C:\Users\rcxsm\Pictures\div\mijn autos\b\dls\test\Screenshot_20200927-195518_Instagram.jpg"
         img_in16=r"C:\Users\rcxsm\Downloads\Screenshot_20220920-210948_Instagram.jpg"
         images_in = [img_in15]#, img_in15]#,img_in7, img_in2,img_in12, ] #,img_in4,img_in5, img_in6,img_in7,img_in8,img_in9,img_in10, img_in11,img_in12]
-        show_image =False
-        save_image = False
+        show_image =True
+        save_image = True
         save_csv = False
         img_out =  r"C:\Users\rcxsm\Documents\python_scripts\python_scripts_rcsmit\extras\florence_colgate2_annotated.jpg"
         csv_out = r"C:\Users\rcxsm\Documents\python_scripts\python_scripts_rcsmit\extras\florence2.csv"
