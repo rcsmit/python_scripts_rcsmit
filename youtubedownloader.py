@@ -35,7 +35,7 @@ from pytubefix import YouTube
 # from time import sleep
 
 from moviepy.video.io.ffmpeg_tools import ffmpeg_extract_subclip
-import win32clipboard  # part of pywin32
+import win32clipboard
 
 
 def convert_single_file_to_mp3(mp4, delete_original):
@@ -262,7 +262,7 @@ def download_file(durl, path_to_save, what, start_time, end_time, convert):
         sys.stdout.write(text)
         sys.stdout.flush()
     if durl is not None:
-        s1 = int(time.time())
+        start_time_download = int(time.time())
         # Title and Time
         # try:
         print((YouTube(durl)).title)
@@ -298,6 +298,11 @@ def download_file(durl, path_to_save, what, start_time, end_time, convert):
             else:
                 new_filename = crop_file_video(mp4, start_time, end_time)
         
+            end_time_download = int(time.time())
+            needed_time_download = end_time_download - start_time_download
+            print(" ")  # to compensate the  sys.stdout.flush()
+
+            print(f"Downloading took {str(needed_time_download)} seconds ....")
             if convert:
                 convert_single_file_to_mp3(new_filename, True)
 
@@ -316,11 +321,13 @@ def download_file(durl, path_to_save, what, start_time, end_time, convert):
             else:
                 new_filename = crop_file_video(mp4, start_time, end_time)
 
-        s2 = int(time.time())
-        s2x = s2 - s1
-        print(" ")  # to compensate the  sys.stdout.flush()
+        end_time_converting = int(time.time())
+        needed_time_download_and_converting = end_time_converting - start_time_download
+        convert_time = needed_time_download_and_converting-needed_time_download
 
-        print(f"Downloading  took {str(s2x)} seconds ....)")
+        print(" ")  # to compensate the  sys.stdout.flush()
+        print(f"Converting  took {str(convert_time)} seconds ....")
+        print(f"Downloading+converting  took {str(needed_time_download_and_converting)} seconds ....")
     else:
         print ("Nothing downloaded")
 
@@ -414,7 +421,7 @@ def convert_all_files_in_directory_to_mp3(path):
     Args:
         path ([type]): [description]
     """
-    s1 = int(time.time())
+    start_time_download = int(time.time())
     number_of_files = 0
     with os.scandir(path) as it:
         for entry in it:
@@ -426,7 +433,7 @@ def convert_all_files_in_directory_to_mp3(path):
                 number_of_files += 1
 
     print(
-        f"COMPLETE - Totaal  {int(time.time() -s1)} sec. | {number_of_files} files => {round((time.time() -s1) / number_of_files)} sec. per file"
+        f"COMPLETE - Totaal  {int(time.time() -start_time_download)} sec. | {number_of_files} files => {round((time.time() -start_time_download) / number_of_files)} sec. per file"
     )
 
 
@@ -462,7 +469,15 @@ def main_download(
             if "youtube.com" in url:
                 print(f"Retrieving {url}")
             else:
-                url = input("URL to download (q = quit): ")
+                link, video_title = find_first_youtube_video(url)
+                i_ = input(f"Press [y] to download {video_title}")
+                if i_.lower() == "y":
+                    url = link
+                elif i_.lower() == "q":
+                    print("OK. Doei")
+                    quit()
+
+                #url = input("URL to download (q = quit): ")
 
         else:
             url = input("URL to download (q = quit): ")
@@ -680,45 +695,28 @@ def download_tracklist(trackstring, timestamp_regex, mix_title, mix_url):
 
 def main_download_tracklist():
     """--- Downloads a list of tracks from YouTube as audio or video files. ---"""
-    trackstring  ="""1. Underworld - Born Slippy
-2. Floorplan - Never Grow Old
-3. Hardfloor - Acperience 1
-4. Josh Wink - Higher State of Consciousness (Tweekin Acid Funk)
-5. Rolando - Knight of the Jaguar
-6. Donna Summer - I Feel Love
-7. Oxia - Domino
-8. Octave One - Black Water
-9. Green Velvet - Flash
-10. Fischerspooner - Emerge
-Jaydee - Plastic Dreams 
-Destination - Definition of Love (G-Flame and Mr G remix)
-Smith and Selway - Move
-Agoria - La onzieme marche (Phil Kieran mix)
-Renato Cohen - Pontape
-Nathan Fake - The sky was pink (James Holden mix)
-Sabres of Paradise - Smokebelch (David Holmes remix)
-Plastikman - Spastik
-Matador - Kingswing
-Bryan Zentz - D clash
-Josh Wink - Don't laugh
-Joey beltram energy flash
-Hardfloor acaperiance
-Laurent garnier crispy bacon
-Paragon 1 the deliverer
-The sabres of paradise
-Robert armani circus bells
-Jeff Mills- Step to enchantment
-Laurent Garnier - Crispy bacon
-Dense n Pika- Louder than a bomb
-Joey Beltram- Energy flash
-Joey Beltram - the Fuzz
-Hardfloor- Acperience
-Octave one - the 3rd degree
-Commander Tom - R am eye
-Funk d void. - Bad coffee
-Slam - Positive education"""
+    trackstring  ="""21. Frankie Valli - Can’t Take My Eyes Off You
+22. Barry White - You’re the First, the Last, My Everything
+23. Tina Turner - The Best
+24. Queen - Crazy Little Thing Called Love
+25. Phil Collins - You Can’t Hurry Love
+26. Elton John - I’m Still Standing
+27. Bee Gees - Stayin’ Alive
+28. Village People - Y.M.C.A.
+29. Weather Girls - It’s Raining Men
+30. Cyndi Lauper - Girls Just Want to Have Fun
+31. Blondie - Heart of Glass
+32. George Michael - Faith
+33. Bryan Adams - Summer of ’69
+34. Cher - Believe
+35. Roxette - The Look
+36. UB40 - Red Red Wine
+37. Shania Twain - Man! I Feel Like a Woman!
+38. Pointer Sisters - Jump (For My Love)
+39. Stevie Wonder - Superstition
+40. John Travolta & Olivia Newton-John - You’re the One That I Want"""
 
-    mix_title ="Acroyoga"
+    mix_title ="Kroegdance 2"
     mix_url = "https://www.xxxx.com"
     #timestamp_regex = r"\d{2}:\d{2}
     timestamp_regex = r"\d{1,2}. " # 1 or 2 digits, followed by a dot and a space  
@@ -740,7 +738,7 @@ def main():
     ask = False  # ask if you want to download each file
     wait = True  # wait a random number of seconds in between the downloads
     get_clipboard = True
-    get_url_list = False
+    get_url_list = False #True
 
     # get_clipboard = False
     #
@@ -750,7 +748,8 @@ def main():
     # DOWNLOAD AUDIO OR VIDEO FROM A URL OR LIST
     #url_list =['https://www.youtube.com/watch?v=6TYsOMYaz6E', 'https://www.youtube.com/watch?v=605bwlAz_iQ', 'https://www.youtube.com/watch?v=SnnwwWY4uMU', 'https://www.youtube.com/watch?v=5IrHzrg4qdQ', 'https://www.youtube.com/watch?v=aU6z-pPEmY0', 'https://www.youtube.com/watch?v=DwpedKWwS3w', 'https://www.youtube.com/watch?v=uu9u_gesIfo', 'https://www.youtube.com/watch?v=jgVrX1u9afY', 'https://www.youtube.com/watch?v=l-vSl7BuxGs', 'https://www.youtube.com/watch?v=XwX9w00dZcY', 'https://www.youtube.com/watch?v=NiBQ-WLL84E', 'https://www.youtube.com/watch?v=JZfJTSlhOXM']
     
-    url_list = ['https://www.youtube.com/watch?v=vl9p7Sd_ZaE', 'https://www.youtube.com/watch?v=RRQyyKaTFNA', 'https://www.youtube.com/watch?v=WZS6hpgkxOU', 'https://www.youtube.com/watch?v=U4ByNuRtTFI', 'https://www.youtube.com/watch?v=fJkAHiiIY6M', 'https://www.youtube.com/watch?v=6K-ifQV1gjU', 'https://www.youtube.com/watch?v=aSwQL1o4u5Q', 'https://www.youtube.com/watch?v=B_UBYDdO3lk', 'https://www.youtube.com/watch?v=kObuc3KyTaE', 'https://www.youtube.com/watch?v=4n_fKoXmjCs', 'https://www.youtube.com/watch?v=Zce5WnphEkg', 'https://www.youtube.com/watch?v=_Y0seJSuRak', 'https://www.youtube.com/watch?v=rMJpDYzazfI', 'https://www.youtube.com/watch?v=ibof3M0pZZ0', 'https://www.youtube.com/watch?v=KYdMHXfgdjk', 'https://www.youtube.com/watch?v=z3hef-Y16g0', 'https://www.youtube.com/watch?v=Eg5qYmTRpes', 'https://www.youtube.com/watch?v=-m0vC9BlQ3I', 'https://www.youtube.com/watch?v=lTdzWjzbsN8', 'https://www.youtube.com/watch?v=TStYHJuC8To', 'https://www.youtube.com/watch?v=bObN_VOXRPs', 'https://www.youtube.com/watch?v=NSDBqfNHOK8', 'https://www.youtube.com/watch?v=lZ4-fLdTLss', 'https://www.youtube.com/watch?v=oaVA1fnzczI', 'https://www.youtube.com/watch?v=4bIe8M8qXJ8']
+    #url_list = ['https://www.youtube.com/watch?v=vl9p7Sd_ZaE', 'https://www.youtube.com/watch?v=RRQyyKaTFNA', 'https://www.youtube.com/watch?v=WZS6hpgkxOU', 'https://www.youtube.com/watch?v=U4ByNuRtTFI', 'https://www.youtube.com/watch?v=fJkAHiiIY6M', 'https://www.youtube.com/watch?v=6K-ifQV1gjU', 'https://www.youtube.com/watch?v=aSwQL1o4u5Q', 'https://www.youtube.com/watch?v=B_UBYDdO3lk', 'https://www.youtube.com/watch?v=kObuc3KyTaE', 'https://www.youtube.com/watch?v=4n_fKoXmjCs', 'https://www.youtube.com/watch?v=Zce5WnphEkg', 'https://www.youtube.com/watch?v=_Y0seJSuRak', 'https://www.youtube.com/watch?v=rMJpDYzazfI', 'https://www.youtube.com/watch?v=ibof3M0pZZ0', 'https://www.youtube.com/watch?v=KYdMHXfgdjk', 'https://www.youtube.com/watch?v=z3hef-Y16g0', 'https://www.youtube.com/watch?v=Eg5qYmTRpes', 'https://www.youtube.com/watch?v=-m0vC9BlQ3I', 'https://www.youtube.com/watch?v=lTdzWjzbsN8', 'https://www.youtube.com/watch?v=TStYHJuC8To', 'https://www.youtube.com/watch?v=bObN_VOXRPs', 'https://www.youtube.com/watch?v=NSDBqfNHOK8', 'https://www.youtube.com/watch?v=lZ4-fLdTLss', 'https://www.youtube.com/watch?v=oaVA1fnzczI', 'https://www.youtube.com/watch?v=4bIe8M8qXJ8']
+    url_list = ['https://www.youtube.com/watch?v=c18441Eh_WE', 'https://www.youtube.com/watch?v=aXgSHL7efKg', 'https://www.youtube.com/watch?v=O0_H3F84Yjk', 'https://www.youtube.com/watch?v=A_sY2rjxq6M', 'https://www.youtube.com/watch?v=KhcaPNuaJNU', 'https://www.youtube.com/watch?v=hDHW5wXBvLw']  
     main_download(
         path_to_save,
         what,
