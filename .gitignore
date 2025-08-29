@@ -4,3 +4,4 @@ input/gitnore/
 .streamlit/
 keys.py
 secrets/
+ffmpeg.exe
