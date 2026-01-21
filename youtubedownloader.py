@@ -46,27 +46,42 @@ def convert_single_file_to_mp3(mp4, delete_original):
         delete_original (boolean): Delete Orignal?
     """
 
-    if right(mp4, 7) == "mp4.mp4":
-        mp3 = left(mp4, (len(mp4) - 7)) + ".mp3"
+    # if right(mp4, 7) == "mp4.mp4":
+    #     mp3 = left(mp4, (len(mp4) - 7)) + ".mp3"
+    # else:
+    #     mp3 = left(mp4, (len(mp4) - 4)) + ".mp3"
+    if right(mp4, 8) == "mp4.mp4":
+        mp3 = left(mp4, (len(mp4) - 8)) + ".mp3"
     else:
-        mp3 = left(mp4, (len(mp4) - 4)) + ".mp3"
+        mp3 = left(mp4, (len(mp4) - 5)) + ".mp3"
 
-    # Converting - Not needed anymore since MP3's are downloaded directly
+    # # Converting - Not needed anymore since MP3's are downloaded directly
+    # print(f"Converting... {mp4}")
+    # subprocess.call(
+    #     [
+    #         "C:\\Users\\rcxsm\\Music\\MET PYTHON GEDOWNLOAD\\ffmpeg.exe",
+    #         "-i",
+    #         mp4,
+    #         mp3,
+    #     ],
+    #     stdout=subprocess.DEVNULL,
+    #     stderr=subprocess.DEVNULL,
+    # )
+    
+
+
+    
     print(f"Converting... {mp4}")
-    subprocess.call(
-        [
-            "C:\\Users\\rcxsm\\Music\\MET PYTHON GEDOWNLOAD\\ffmpeg.exe",
-            "-i",
-            mp4,
-            mp3,
-        ],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
+    # freaccmd.exe input.webm -o output.mp3 --encoder lame --bitrate 192
+    subprocess.call([
+        r"C:\Program Files\freac\freaccmd.exe",
+        mp4, "-o", mp3,
+        "--encoder", "lame",
+        "--bitrate", "320",
+    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
     if delete_original:
         os.remove(mp4)
-
-
 def cleanup(test_string):
     """Avoid forbidden characters in file names
 
@@ -274,9 +289,10 @@ def download_file(durl, path_to_save, what, start_time, end_time, convert):
 
         pytube.request.default_range_size = int(1048576 / 1)  # 9437184
         _filename = title
-        mp4 = f"{_filename}.mp4"
+        print (_filename)
+        #mp4 = f"{_filename}.mp4"
         mp3 = f"{_filename}.mp3"
-
+        mp4 = f"{_filename}.webm"
         if os.path.isfile(mp4) or os.path.isfile(mp3):
             print(f"File [{mp4}] exist already. I stop")
             return
@@ -285,8 +301,13 @@ def download_file(durl, path_to_save, what, start_time, end_time, convert):
 
         if what == "audio":
             # YouTube(durl).streams.first().download(filename=mp4)       # for music
+            # uncomment to see available streams
+            #print (YouTube(durl, on_progress_callback=on_progress).streams.all())
+            
             YouTube(durl, on_progress_callback=on_progress).streams.get_by_itag(
-                140
+                # 140 #128k
+                251 # webm
+              
             ).download(filename=mp4)
             # filesize = YouTube(durl).streams.get_by_itag(140).filesize
             # print (f"Filesize = {round(filesize/1048576,2)} MB)")
@@ -295,6 +316,9 @@ def download_file(durl, path_to_save, what, start_time, end_time, convert):
                 new_filename = (
                     left(mp4, (len(mp4) - 4)) + ".mp4"
                 )  # for some reason files are saved as namemp4.mp4
+                new_filename = (
+                    left(mp4, (len(mp4) - 5)) + ".webm"
+                )  # for some reason files are saved as namemp4.mp4
             else:
                 new_filename = crop_file_video(mp4, start_time, end_time)
         
@@ -302,7 +326,9 @@ def download_file(durl, path_to_save, what, start_time, end_time, convert):
             needed_time_download = end_time_download - start_time_download
             print(" ")  # to compensate the  sys.stdout.flush()
 
-            print(f"Downloading took {str(needed_time_download)} seconds ....")
+            seconds = int(needed_time_download)
+            minutes, seconds = divmod(seconds, 60)
+            print(f"Downloading took {str(needed_time_download)} seconds .... ({minutes:02d}:{seconds:02d})")
             if convert:
                 convert_single_file_to_mp3(new_filename, True)
 
@@ -314,6 +340,10 @@ def download_file(durl, path_to_save, what, start_time, end_time, convert):
             )  # for video 360p
             # filesize = YouTube(durl).streams.get_by_itag(18).filesize
             # print (f"Filesize = {round(filesize/1048576,2)} MB)")
+
+            end_time_download = int(time.time())
+            needed_time_download = end_time_download - start_time_download
+
             if start_time is None:
                 new_filename = (
                     left(mp4, (len(mp4) - 4)) + ".mp4"
@@ -324,10 +354,18 @@ def download_file(durl, path_to_save, what, start_time, end_time, convert):
         end_time_converting = int(time.time())
         needed_time_download_and_converting = end_time_converting - start_time_download
         convert_time = needed_time_download_and_converting-needed_time_download
-
         print(" ")  # to compensate the  sys.stdout.flush()
-        print(f"Converting  took {str(convert_time)} seconds ....")
-        print(f"Downloading+converting  took {str(needed_time_download_and_converting)} seconds ....")
+
+        # Converting time
+        total_seconds_conv = int(convert_time)
+        m_conv, s_conv = divmod(total_seconds_conv, 60)
+        print(f"Converting took {total_seconds_conv} seconds ({m_conv:02d}:{s_conv:02d}) ....")
+
+        # Downloading + converting
+        total_seconds_all = int(needed_time_download_and_converting)
+        m_all, s_all = divmod(total_seconds_all, 60)
+        print(f"Downloading+converting took {total_seconds_all} seconds ({m_all:02d}:{s_all:02d}) ....")
+        
     else:
         print ("Nothing downloaded")
 
@@ -459,8 +497,11 @@ def main_download(
     if get_url_list:
         for i,u in enumerate(url_list):
             print (f"=== {i+1} / {len(url_list)} ===")
-            download_file(u, path_to_save, what, start_time, end_time, convert)
-
+            if u != None:
+                try:
+                    download_file(u, path_to_save, what, start_time, end_time, convert)
+                except Exception as e:
+                    print (f"Error downloading {u}\n{e}")
     else:
         if get_clipboard:
             win32clipboard.OpenClipboard()
@@ -601,14 +642,16 @@ def find_first_youtube_video(search ):
         data = response.json()
     
         if "items" not in data or not data["items"]:
-            raise KeyError("No video found")
+            print (f"No video found- {search}")
+            link, video_title = None, None
+        else:
         
-        video_id = data["items"][0]["id"]["videoId"]
+            video_id = data["items"][0]["id"]["videoId"]
 
-        video_title = data["items"][0]["snippet"]["title"]
-        
+            video_title = data["items"][0]["snippet"]["title"]
+            
 
-        link = f"https://www.youtube.com/watch?v={video_id}"
+            link = f"https://www.youtube.com/watch?v={video_id}"
         return link, video_title
 
 
@@ -695,29 +738,65 @@ def download_tracklist(trackstring, timestamp_regex, mix_title, mix_url):
 
 def main_download_tracklist():
     """--- Downloads a list of tracks from YouTube as audio or video files. ---"""
-    trackstring  ="""21. Frankie Valli - Can’t Take My Eyes Off You
-22. Barry White - You’re the First, the Last, My Everything
-23. Tina Turner - The Best
-24. Queen - Crazy Little Thing Called Love
-25. Phil Collins - You Can’t Hurry Love
-26. Elton John - I’m Still Standing
-27. Bee Gees - Stayin’ Alive
-28. Village People - Y.M.C.A.
-29. Weather Girls - It’s Raining Men
-30. Cyndi Lauper - Girls Just Want to Have Fun
-31. Blondie - Heart of Glass
-32. George Michael - Faith
-33. Bryan Adams - Summer of ’69
-34. Cher - Believe
-35. Roxette - The Look
-36. UB40 - Red Red Wine
-37. Shania Twain - Man! I Feel Like a Woman!
-38. Pointer Sisters - Jump (For My Love)
-39. Stevie Wonder - Superstition
-40. John Travolta & Olivia Newton-John - You’re the One That I Want"""
+    trackstring  ="""* iiO - Rapture
+* Spiller - Groovejet
+* Roger Sanchez - Another Chance
+* Benny Benassi - Satisfaction
+* Junior Jack - Thrill Me
+* Stardust - Music Sounds Better With You
+* Armand van Helden - You Don’t Know Me
+* Kylie Minogue - Love At First Sight
+* Eric Prydz - Call On Me
+* Sono - Keep Control
+* Lasgo - Something
+* Lasgo - Alone
+* Sylver - Turn The Tide
+* Sylver - Forgiven
+* Milk Inc - In My Eyes
+* Milk Inc - Walk On Water
+* Ian Van Dahl - Castles In The Sky
+* Push - Universal Nation
+* Push - Strange World
+* Yves Deruyter - The Rebel
+* Jones & Stephenson - The First Rebirth
+* Energy 52 - Café Del Mar
+* Veracocha - Carte Blanche
+* Tiësto - Lethal Industry
+* The Moon - Blow Up The Speakers
+* 2 Unlimited - No Limit (2000 Remix)
+* Minimalistix - Close Cover
+* DHT feat. Edmee - Listen To Your Heart (Dance Mix)
+* Fisher - Losing It
+* James Hype - Ferrari
+* John Summit - Where You Are
+* Swedish House Mafia - One
+* Alesso - Heroes
+* David Guetta x MORTEN - Dreamer
+* MEDUZA - Piece Of Your Heart
+* Avicii - Levels
+* Calvin Harris - This Is What You Came For
+* Zedd - Clarity
+* Alok x The Chainsmokers - Jungle
+* Martin Garrix - Animals
+* Dimitri Vegas & Like Mike x MOGUAI - Mammoth
+* Dimitri Vegas & Like Mike x Martin Garrix - Tremor
+* Hardwell - Spaceman
+* W&W - Bigfoot
+* Push - Universal Nation (2020 Remix)
+* Age Of Love - The Age Of Love (Charlotte de Witte & Enrico Sangiuliano Remix)
+* Faithless - Insomnia (2.0 Edit)
+* Binary Finary - 1998 (Rework)
+* Lasgo - Something (Jay Sas Remode)
+* Sylver - Turn The Tide (Modern Remix)
+* Ian Van Dahl - Castles In The Sky (2021 Remix)
+* Tiësto - The Business (Trance Rework)
+* Armin van Buuren - Blah Blah Blah
+* Maddix - Heute Nacht
+* Brennan Heart - Imaginary
+"""
 
-    mix_title ="Kroegdance 2"
-    mix_url = "https://www.xxxx.com"
+    mix_title ="Joris Voorn Live at A’DAM Rooftop Sessions - Amsterdam SAIL Week 2025 [Full Set]"
+    mix_url = "https://www.youtube.com/watch?v=OI20ddk6How"
     #timestamp_regex = r"\d{2}:\d{2}
     timestamp_regex = r"\d{1,2}. " # 1 or 2 digits, followed by a dot and a space  
 
@@ -738,18 +817,21 @@ def main():
     ask = False  # ask if you want to download each file
     wait = True  # wait a random number of seconds in between the downloads
     get_clipboard = True
-    get_url_list = False #True
+    #get_url_list = True #False #True
 
     # get_clipboard = False
     #
-    # get_url_list = True
+    get_url_list = False# True
     
 
     # DOWNLOAD AUDIO OR VIDEO FROM A URL OR LIST
     #url_list =['https://www.youtube.com/watch?v=6TYsOMYaz6E', 'https://www.youtube.com/watch?v=605bwlAz_iQ', 'https://www.youtube.com/watch?v=SnnwwWY4uMU', 'https://www.youtube.com/watch?v=5IrHzrg4qdQ', 'https://www.youtube.com/watch?v=aU6z-pPEmY0', 'https://www.youtube.com/watch?v=DwpedKWwS3w', 'https://www.youtube.com/watch?v=uu9u_gesIfo', 'https://www.youtube.com/watch?v=jgVrX1u9afY', 'https://www.youtube.com/watch?v=l-vSl7BuxGs', 'https://www.youtube.com/watch?v=XwX9w00dZcY', 'https://www.youtube.com/watch?v=NiBQ-WLL84E', 'https://www.youtube.com/watch?v=JZfJTSlhOXM']
     
     #url_list = ['https://www.youtube.com/watch?v=vl9p7Sd_ZaE', 'https://www.youtube.com/watch?v=RRQyyKaTFNA', 'https://www.youtube.com/watch?v=WZS6hpgkxOU', 'https://www.youtube.com/watch?v=U4ByNuRtTFI', 'https://www.youtube.com/watch?v=fJkAHiiIY6M', 'https://www.youtube.com/watch?v=6K-ifQV1gjU', 'https://www.youtube.com/watch?v=aSwQL1o4u5Q', 'https://www.youtube.com/watch?v=B_UBYDdO3lk', 'https://www.youtube.com/watch?v=kObuc3KyTaE', 'https://www.youtube.com/watch?v=4n_fKoXmjCs', 'https://www.youtube.com/watch?v=Zce5WnphEkg', 'https://www.youtube.com/watch?v=_Y0seJSuRak', 'https://www.youtube.com/watch?v=rMJpDYzazfI', 'https://www.youtube.com/watch?v=ibof3M0pZZ0', 'https://www.youtube.com/watch?v=KYdMHXfgdjk', 'https://www.youtube.com/watch?v=z3hef-Y16g0', 'https://www.youtube.com/watch?v=Eg5qYmTRpes', 'https://www.youtube.com/watch?v=-m0vC9BlQ3I', 'https://www.youtube.com/watch?v=lTdzWjzbsN8', 'https://www.youtube.com/watch?v=TStYHJuC8To', 'https://www.youtube.com/watch?v=bObN_VOXRPs', 'https://www.youtube.com/watch?v=NSDBqfNHOK8', 'https://www.youtube.com/watch?v=lZ4-fLdTLss', 'https://www.youtube.com/watch?v=oaVA1fnzczI', 'https://www.youtube.com/watch?v=4bIe8M8qXJ8']
-    url_list = ['https://www.youtube.com/watch?v=c18441Eh_WE', 'https://www.youtube.com/watch?v=aXgSHL7efKg', 'https://www.youtube.com/watch?v=O0_H3F84Yjk', 'https://www.youtube.com/watch?v=A_sY2rjxq6M', 'https://www.youtube.com/watch?v=KhcaPNuaJNU', 'https://www.youtube.com/watch?v=hDHW5wXBvLw']  
+    #url_list = ['https://www.youtube.com/watch?v=c18441Eh_WE', 'https://www.youtube.com/watch?v=aXgSHL7efKg', 'https://www.youtube.com/watch?v=O0_H3F84Yjk', 'https://www.youtube.com/watch?v=A_sY2rjxq6M', 'https://www.youtube.com/watch?v=KhcaPNuaJNU', 'https://www.youtube.com/watch?v=hDHW5wXBvLw']  
+    #url_list = ['https://www.youtube.com/watch?v=Je41i8Ix69Y', 'https://www.youtube.com/watch?v=8Fcrywzt_4M', 'https://www.youtube.com/watch?v=3rUYm_zfi-Y', 'https://www.youtube.com/watch?v=WTmkaFuWZS8', 'https://www.youtube.com/watch?v=wU3Y-ide2qA', 'https://www.youtube.com/watch?v=T-Jeh4kfgk0', 'https://www.youtube.com/watch?v=yVRcrlevPR4', 'https://www.youtube.com/watch?v=rHDYV19RJYA', 'https://www.youtube.com/watch?v=iYklRkY4NPU', 'https://www.youtube.com/watch?v=L5DXZU871lc', 'https://www.youtube.com/watch?v=aoIjCw-Fg1c']
+    url_list = ['https://www.youtube.com/watch?v=uTJtfytoYy4','https://www.youtube.com/watch?v=FQlAEiCb8m0', 'https://www.youtube.com/watch?v=dwDns8x3Jb4', 'https://www.youtube.com/watch?v=xW17jtkjvvg', 'https://www.youtube.com/watch?v=QFGMQZyvnmY' ]
+    url_list = ['https://www.youtube.com/watch?v=QZmKsHP-EmE', 'https://www.youtube.com/watch?v=XanY0v3kdqI', 'https://www.youtube.com/watch?v=sE0pssKLfwk', 'https://www.youtube.com/watch?v=Nio-Fxx5hI4', 'https://www.youtube.com/watch?v=Bk1DTmz0-yY', 'https://www.youtube.com/watch?v=0r_4nJW9Sk0', 'https://www.youtube.com/watch?v=R2tzXbKr3dA', 'https://www.youtube.com/watch?v=W-jJ9Ft2_xM', 'https://www.youtube.com/watch?v=Pgxb3WbBx5Q', 'https://www.youtube.com/watch?v=hYhfBMIyPfU', 'https://www.youtube.com/watch?v=_rULFcyy6lw', 'https://www.youtube.com/watch?v=8y1h2KtpB4Q', None, 'https://www.youtube.com/watch?v=KiSjtLajTy0', 'https://www.youtube.com/watch?v=iZLd-0DFVYc', 'https://www.youtube.com/watch?v=jPM5ZtG4Gd0', 'https://www.youtube.com/watch?v=qx3c0QFu5bo', 'https://www.youtube.com/watch?v=LYASDAtumrY']
     main_download(
         path_to_save,
         what,
@@ -767,6 +849,55 @@ def main():
 
     # CONVERT A SINGLE FILE
     # convert_single_file_to_mp3("C:\\Users\\rcxsm\\Music\\MET PYTHON GEDOWNLOAD\\nieuw\\Taylor Swift - Everything Has Changed ft Ed Sheeranmp4.mp4")
+def mp3_retag():
+    import os
+from mutagen.easyid3 import EasyID3
+from mutagen.id3 import ID3, error
+
+def update_tags_from_filenames():
+    """
+    Reads all MP3 files in a folder and updates their ID3 tags (artist and title)
+    based on the filename format: Artist - Title.mp3
+    """
+
+
+    folder_path = r"C:\Users\rcxsm\Music\MET PYTHON GEDOWNLOAD\mp3_retag"
+   
+    
+    for filename in os.listdir(folder_path):
+        print(filename)
+        if filename.lower().endswith(".mp3"):
+            filepath = os.path.join(folder_path, filename)
+
+            try:
+                # Split filename into Artist and Title
+                name_part = os.path.splitext(filename)[0]
+                if " - " in name_part:
+                    artist, title = name_part.split(" - ", 1)
+                else:
+                    print(f"Skipping '{filename}' (no ' - ' in name)")
+                    continue
+
+                # Load or create ID3 tags
+                try:
+                    audio = EasyID3(filepath)
+                except error:
+                    audio = ID3()
+                    audio.add_tags()
+
+                # Update tags
+                audio["artist"] = artist.strip()
+                audio["title"] = title.strip()
+
+                # Save changes
+                audio.save(filepath)
+                print(f"✅ Updated: {filename} → Artist='{artist}', Title='{title}'")
+
+            except Exception as e:
+                print(f"⚠️ Error with '{filename}': {e}")
+
+
+
 
 if __name__ == "__main__":
     
@@ -779,5 +910,9 @@ if __name__ == "__main__":
     # directory = "C:\\Users\\rcxsm\\Music\\MET PYTHON GEDOWNLOAD\\ttpd\\" 
     # add_pretext(directory)
 
+
+    #  C:\Users\rcxsm\Documents\python_scripts\python_scripts_rcsmit\dowload_playlist_spotify_tidal.py
     main()
     #main_download_tracklist()
+
+    #update_tags_from_filenames()

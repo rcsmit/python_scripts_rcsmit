@@ -5,3 +5,4 @@ input/gitnore/
 keys.py
 secrets/
 ffmpeg.exe
+credentials.json

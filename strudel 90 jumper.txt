@@ -1,0 +1,105 @@
+// Strudel Jumper arrangement
+setCps(20/60/4)
+// Lagen
+const kick = s("[bd*4]")
+
+
+const hats = s("[~ hh ~ hh]")
+  .gain(0.85)
+
+const clap = s("~ sd ~ sd")
+  .gain(0.9)
+
+const bass = note("c3 ~ g3 ~ f3 ~ g3 ~")
+  .sound("square")
+  .sustain(0.72)
+  .lpf(450)
+  .gain(1)
+
+const bassVar = note("c3 ~ a#2 ~ g2 ~ a#2 ~")
+   .sound("square")
+  //.sustain(0.12)
+  // .lpf(450)
+  // .gain(1)
+  //.sound("sawtooth")
+  .lpf(500)
+  //.lpq(3)
+  //.delay(0.5)
+  //.delaytime("0.25 0.5")
+
+const leadSoft = note("c5 g4 a#4 g4 c5 g4 a#4 g4")
+  .sound("saw")
+  .sustain(0.8)
+  .release(0.15)
+  .lpf(2500)
+  .gain(0.8)
+
+const leadFull = leadSoft .lpf(6000)
+
+const riser = s("noise*8")
+  .slow(2)
+  .gain(range(0.1, 1).sine)
+  .hpf(range(400, 8000).saw)
+  .room(0.4)
+
+
+// Typische Jumper Records-structuur (Polyend Tracker opzet)
+// Tijd (mm:ss)	Beats	Inhoud	Wat speel je in Tracker
+// 0:00–0:16	0–16	Kick intro	CH1: Kick (4/4)
+// 0:16–0:32	17–32	Kick + offbeat hihat	CH1: Kick, CH2: Closed HH op 2/4/6/8/…
+// 0:32–0:48	33–48	Kick + clap op 2/4	CH3: Clap/snare op beat 2 en 4
+// 0:48–1:04	49–64	Bassline zacht	CH4: Bass (triplet rolling, filter dicht)
+// 1:04–1:20	65–80	Bassline vol open	CH4: Bass (filter open), CH1–3: drums
+// 1:20–1:36	81–96	Lead zacht erbij	CH5: Lead riff (laag volume/filter dicht)
+// 1:36–1:52	97–112	Eerste drop	CH5: Lead vol open, alle drums + bass
+// 1:52–2:08	113–128	Drop doorgaat	Variatie in hats of extra rimshot
+// 2:08–2:24	129–144	Break begint	Alleen lead/pads, drums weg
+// 2:24–2:40	145–160	Break door	Eventueel vocal stab of sweep
+// 2:40–2:56	161–176	Build-up	Snare roll (16e), riser/FX
+// 2:56–3:12	177–192	Build-up climax	Lead filter open, tension
+// 3:12–3:28	193–208	Tweede drop	Alles vol erin, extra variatie
+// 3:28–3:44	209–224	Tweede drop door	Stop&Go (1 bar stilte, dan knal)
+// 3:44–4:00	225–240	Outro 1	Lead weg, alleen bass + drums
+// 4:00–4:16	241–256	Outro 2	Alleen kick + hihat
+// 4:16–end	257–320	Fade out/mix-out	Kick tot einde, klaar voor mix
+// Secties
+const sec1 = stack(kick)
+const sec2 = stack(kick, hats) 
+const sec3 = stack(kick, hats, clap) 
+const sec4 = stack(kick, hats, clap, bass) 
+const sec5 = stack(kick, hats, clap, bass, leadFull) 
+const sec6 = leadSoft 
+const sec7 = stack(leadSoft, riser) 
+const sec8 = stack(kick, hats, clap, bassVar, leadFull)
+const sec9 = stack(kick, hats, clap, bassVar) 
+const sec10 = stack(bassVar)
+// // Volgorde
+// cat(sec1, sec2, sec3, sec4, sec5, sec6, sec7, sec8, sec9)
+
+// //cat([sec9])
+
+ // Sequence: each section plays 8 times
+cat(
+  sec1.fast(8),
+  sec2.fast(8),
+  sec3.fast(8),
+  sec4.fast(8),
+  sec5.fast(8),
+  sec6.fast(8),
+  sec7.fast(8),
+  sec8.fast(8),
+  sec9.fast(8)
+);
+
+// // equence: each section plays for 8 cycles
+// cat(
+//   sec1.loopAt(8),
+//   sec2.loopAt(8),
+//   sec3.loopAt(8),
+//   sec4.loopAt(8),
+//   sec5.loopAt(8),
+//   sec6.loopAt(8),
+//   sec7.loopAt(8),
+//   sec8.loopAt(8),
+//   sec9.loopAt(8)
+// )

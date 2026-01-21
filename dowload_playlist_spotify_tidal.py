@@ -25,15 +25,15 @@ def process_playlist_and_save(tracks, playlist_id, platform, start_idx, end_idx)
             title = track.name
             artists = ", ".join([artist.name for artist in track.artists])
         
-        playlist_data.append([idx, title, artists])
-        trackstring_lines.append(f"{idx}. {title} — {artists}")
+        playlist_data.append([idx,  artists, title])
+        trackstring_lines.append(f"{idx}. {artists} - {title}")
 
     trackstring = "\n".join(trackstring_lines)
     output_file = f"{platform}_playlist_{playlist_id}.csv"
 
     with open(output_file, mode="w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(["#", "Title", "Artists"])
+        writer.writerow(["#",  "Artists", "Title",])
         writer.writerows(playlist_data)
 
     print(f"Exported {len(playlist_data)} tracks to {output_file}")
@@ -119,7 +119,7 @@ def main():
 
     # Define track range (modify these values as needed)
     start_idx = 1  # Starting track number (1-based)
-    end_idx = 21   # Ending track number (1-based)
+    end_idx = 20  # Ending track number (1-based)
 
     if "spotify" in playlist_url:
         print("Fetching Spotify playlist...")
