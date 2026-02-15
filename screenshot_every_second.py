@@ -237,10 +237,12 @@ def add_prefix(dir_name, prefix):
         print(f'Renamed: {filename} to {prefix}_{filename}')
 
 def main():
-    videoFile = r"C:\Users\rcxsm\Downloads\received_655525212783735.mp4"
-    videoFile = r"C:\Users\rcxsm\Music\MET PYTHON GEDOWNLOAD\Training VDO Driving Licences in Thailand.mp4"
-    imagesFolder = r"C:\Users\rcxsm\Documents\python_scripts\output\dlt"
-    if 1==2:    
+    # videoFile = r"C:\Users\rcxsm\Downloads\received_655525212783735.mp4"
+    # videoFile = r"C:\Users\rcxsm\Music\MET PYTHON GEDOWNLOAD\Training VDO Driving Licences in Thailand.mp4"
+    videoFile = r"C:\Users\rcxsm\Downloads\Screen_Recording_20260131_231751_Instagram.mp4"
+    # imagesFolder = r"C:\Users\rcxsm\Documents\python_scripts\output\dlt"
+    imagesFolder = r"C:\Users\rcxsm\Downloads\hs2026"
+    if 1==1:    
         # FIRST WE EXTRACT THE IMAGES
         extractImages(videoFile,imagesFolder)
 
@@ -252,17 +254,17 @@ def main():
         
         # TAKE OUT THE IMAGES WE DONT WANT IN TE GRID (manually)
 
-
-    # THEN WE CREATE A GRID IMAGE
+    if 1==2:
+        # THEN WE CREATE A GRID IMAGE
+        
+        # create_image_grid(imagesFolder, 3, imagesFolder+'\\output_grid.jpg')
+        create_multiple_image_grids(imagesFolder, 4,12, "_output_grid")
     
-    # create_image_grid(imagesFolder, 3, imagesFolder+'\\output_grid.jpg')
-    create_multiple_image_grids(imagesFolder, 4,12, "_output_grid")
-   
-    # Combine grids into a single PDF
-    combine_grids_to_pdf(imagesFolder, r"C:\Users\rcxsm\Documents\python_scripts\output\dlt\combined_grids.pdf", "_output_grid")
+        # Combine grids into a single PDF
+        combine_grids_to_pdf(imagesFolder, r"C:\Users\rcxsm\Documents\python_scripts\output\dlt\combined_grids.pdf", "_output_grid")
 
-    # add prefix to all files in the directory
-    #add_prefix(r"C:\Users\rcxsm\Documents\python_scripts\output\dlt\q2", "q2_")
+        # add prefix to all files in the directory
+        #add_prefix(r"C:\Users\rcxsm\Documents\python_scripts\output\dlt\q2", "q2_")
 
 if __name__ == "__main__":  
     main()
