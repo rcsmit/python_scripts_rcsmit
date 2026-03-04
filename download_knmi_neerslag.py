@@ -214,7 +214,7 @@ def geocode():
         url = "https://geocode-address-to-location.p.rapidapi.com/v1/geocode/autocomplete"
         querystring = {"text": city, "type": "city", "limit": "1", "countrycodes": "nl", "lang": "en"}
         headers = {
-            "x-rapidapi-key": "80248646camsh63c71f354bafb81p18d8d1jsnb12ac40ce304",
+            "x-rapidapi-key": os.environ.get("RAPIDAPI_KEY", ""),
             "x-rapidapi-host": "geocode-address-to-location.p.rapidapi.com"
         }
 

@@ -126,16 +126,15 @@ def convert_pdf(dir_name):
         page.save(f'C:\\Users\\rcxsm\\Pictures\\ocr_test\\deloitte\\deloitte_{x}.jpg', 'JPEG')
 
 def delete_records_from_db(db_dir, dir, file_name_db ):
-    sql_statement = f"DELETE FROM txt_from_images WHERE directory = '{dir}'"
-    db_name = db_dir + os.sep + file_name_db 
+    db_name = db_dir + os.sep + file_name_db
     con = sl.connect(db_name)
 
     cur = con.cursor()
-    print(f" PROCESSING {sql_statement}")
+    print(f" PROCESSING delete from directory: {dir}")
 
-    cur.execute(sql_statement)
+    cur.execute("DELETE FROM txt_from_images WHERE directory = ?", (dir,))
     con.commit()
-    print (f" DONE {sql_statement}")
+    print(f" DONE deleting from directory: {dir}")
 
 def read_incl_subdir(action, dir_name, extensionsToCheck, file_name_contains, modus, con):
     rootdir = dir_name

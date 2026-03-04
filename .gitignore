@@ -3,3 +3,4 @@ gitnore/
 input/gitnore/
 .streamlit/
 keys.py
+.env
