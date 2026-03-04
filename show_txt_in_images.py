@@ -5,35 +5,38 @@ import os
 from PIL import Image
 
 def delete_records_from_db(dir):
-    sql_statement = f"DELETE FROM txt_from_images WHERE directory = '{dir}'"
     db_name = dir + os.sep + "my_test.db"
     con = sl.connect(db_name)
 
     cur = con.cursor()
-    st.write(f" PROCESSING {sql_statement}")
+    st.write(f" PROCESSING delete from directory: {dir}")
 
-    cur.execute(sql_statement)
+    cur.execute("DELETE FROM txt_from_images WHERE directory = ?", (dir,))
     con.commit()
-    st.write(f" DONE {sql_statement}")
+    st.write(f" DONE deleting from directory: {dir}")
 
 def read_db(filter_file_name, filter_keyword, db_name):
     """Search the database for a certain keyword and/or directory
-    """    
+    """
     #TODO implement filter for directory
-    sql_statement = f" SELECT directory || '\\' || filename AS complete_path, text_in_image FROM txt_from_images "
+    sql_statement = " SELECT directory || '\\' || filename AS complete_path, text_in_image FROM txt_from_images "
+    params = []
     if filter_keyword is not None and filter_file_name is not None:
-        sql_statement = sql_statement + f"WHERE  (text_in_image LIKE '%{filter_keyword}%' AND complete_path LIKE '%{filter_file_name}%' )"
+        sql_statement = sql_statement + "WHERE  (text_in_image LIKE ? AND complete_path LIKE ? )"
+        params = [f"%{filter_keyword}%", f"%{filter_file_name}%"]
     elif filter_keyword is  None and filter_file_name is not None:
-        sql_statement = sql_statement + f"WHERE  (complete_path LIKE '%{filter_file_name}%' )"
+        sql_statement = sql_statement + "WHERE  (complete_path LIKE ? )"
+        params = [f"%{filter_file_name}%"]
     elif filter_keyword is not None and filter_file_name is  None:
-        sql_statement = sql_statement + f"WHERE  (text_in_image LIKE '%{filter_keyword}%' )"
+        sql_statement = sql_statement + "WHERE  (text_in_image LIKE ? )"
+        params = [f"%{filter_keyword}%"]
     try:
         con = sl.connect(db_name)
     except:
         st.error("Error reading the database. Is the filename right and/or did you use forbidden characters ?")
         st.stop()
     try:
-        df = pd.read_sql(sql_statement, con)
+        df = pd.read_sql(sql_statement, con, params=params)
         if len(df)== 0:
             st.warning("No items found")
         else:
@@ -72,13 +75,17 @@ def read_db_all_txt(filter_file_name, filter_keyword, db_name):
     
   
     #TODO implement filter for directory
-    sql_statement = f" SELECT directory || '\\' || filename AS complete_path, text_in_image FROM txt_from_images "
+    sql_statement = " SELECT directory || '\\' || filename AS complete_path, text_in_image FROM txt_from_images "
+    params = []
     if filter_keyword is not None and filter_file_name is not None:
-        sql_statement = sql_statement + f"WHERE  (text_in_image LIKE '%{filter_keyword}%' AND complete_path LIKE '%{filter_file_name}%' )"
+        sql_statement = sql_statement + "WHERE  (text_in_image LIKE ? AND complete_path LIKE ? )"
+        params = [f"%{filter_keyword}%", f"%{filter_file_name}%"]
     elif filter_keyword is  None and filter_file_name is not None:
-        sql_statement = sql_statement + f"WHERE  (complete_path LIKE '%{filter_file_name}%' )"
+        sql_statement = sql_statement + "WHERE  (complete_path LIKE ? )"
+        params = [f"%{filter_file_name}%"]
     elif filter_keyword is not None and filter_file_name is  None:
-        sql_statement = sql_statement + f"WHERE  (text_in_image LIKE '%{filter_keyword}%' )"
+        sql_statement = sql_statement + "WHERE  (text_in_image LIKE ? )"
+        params = [f"%{filter_keyword}%"]
     try:
         con = sl.connect(db_name)
     except:
@@ -86,7 +93,7 @@ def read_db_all_txt(filter_file_name, filter_keyword, db_name):
         st.stop()
     try:
     #if 1 ==1 :
-        df = pd.read_sql(sql_statement, con)
+        df = pd.read_sql(sql_statement, con, params=params)
         if len(df)== 0:
             st.warning("No items found")
         else:
