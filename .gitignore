@@ -3,6 +3,7 @@ gitnore/
 input/gitnore/
 .streamlit/
 keys.py
+.env
 secrets/
 ffmpeg.exe
 credentials.json
