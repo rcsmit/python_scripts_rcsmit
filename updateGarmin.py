@@ -31,6 +31,7 @@ sys.excepthook = show_exception_and_exit
  
 from datetime import datetime, timedelta
 from getpass import getpass
+import os
 from os import mkdir, remove, stat
 from os.path import isdir, isfile
 from subprocess import call
@@ -110,8 +111,8 @@ def http_req(url, post=None, headers=None):
 print('Welcome to the Garmin Connect Activity Type Tool (cycling version)!')
 print('  Currently this tool supports changing your activity type to cycling')
 print('')
-USERNAME='rcx.smit@gmail.com'
-PASSWORD='WvN122334455'
+USERNAME = os.environ.get("GARMIN_USERNAME", "")
+PASSWORD = os.environ.get("GARMIN_PASSWORD", "")
 while not USERNAME:
     USERNAME = ARGS.username if ARGS.username else input('Username: ')
     if not USERNAME:

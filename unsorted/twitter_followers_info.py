@@ -136,12 +136,12 @@ if __name__ == "__main__":
         print("No parameters supplied. Exiting.")
         sys.exit(0)
 
-    API_key="RtkPkZu6vOrSuJmweabrE0iva"
-    API_key_secret="JxC8CjRfKxPB19dZ8LaSO1ZZzUWiGa051Svac7Y0YYDQ8roavO"
- 
+    API_key = os.environ.get("TWITTER_API_KEY", "")
+    API_key_secret = os.environ.get("TWITTER_API_KEY_SECRET", "")
+
     # auth = OAuthHandler(consumer_key, consumer_secret)
     # auth.set_access_token(access_token, access_token_secret)
-    auth = OAuth2BearerHandler("AAAAAAAAAAAAAAAAAAAAAEeXgAEAAAAAIvV6oTf2oncC9po74jSSZMce0yQ%3DeuHzqPpwZ4n84FamNqbL5m00r1HEOa47D1fqVNelkuDTGRAwxp")
+    auth = OAuth2BearerHandler(os.environ.get("TWITTER_BEARER_TOKEN", ""))
     auth_api = API(auth)
 
     for target in account_list:
