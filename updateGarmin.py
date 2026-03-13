@@ -111,8 +111,9 @@ def http_req(url, post=None, headers=None):
 print('Welcome to the Garmin Connect Activity Type Tool (cycling version)!')
 print('  Currently this tool supports changing your activity type to cycling')
 print('')
-USERNAME = os.environ.get("GARMIN_USERNAME", "")
-PASSWORD = os.environ.get("GARMIN_PASSWORD", "")
+from keys import GARMIN_USERNAME, GARMIN_PASSWORD
+USERNAME = GARMIN_USERNAME
+PASSWORD = GARMIN_PASSWORD
 while not USERNAME:
     USERNAME = ARGS.username if ARGS.username else input('Username: ')
     if not USERNAME:

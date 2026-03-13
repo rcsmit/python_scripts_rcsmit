@@ -14,7 +14,6 @@ Shane Lynn
 https://www.shanelynn.ie/batch-geocoding-in-python-with-google-geocoding-api/#script-code
 """
 
-import os
 import pandas as pd
 import requests
 import logging
@@ -35,7 +34,8 @@ logger.addHandler(ch)
 # With a "Google Maps Geocoding API" key from https://console.developers.google.com/apis/, 
 # the daily limit will be 2500, but at a much faster rate.
 # Example: API_KEY = 'AIzaSyC9azed9tLdjpZNjg2_kVePWvMIBq154eA'
-API_KEY = os.environ.get("GOOGLE_MAPS_API_KEY", "")
+from keys import GOOGLE_MAPS_API_KEY
+API_KEY = GOOGLE_MAPS_API_KEY
 
 # Backoff time sets how many minutes to wait between google pings when your API limit is hit
 BACKOFF_TIME = 30

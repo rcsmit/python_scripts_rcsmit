@@ -5,6 +5,7 @@ import os
 import zipfile
 import csv
 import polars as pl
+from keys import RAPIDAPI_KEY
 
 """
 DOWNLOADING INFO FROM https://www.knmi.nl/nederland-nu/klimatologie/monv/reeksen
@@ -214,7 +215,7 @@ def geocode():
         url = "https://geocode-address-to-location.p.rapidapi.com/v1/geocode/autocomplete"
         querystring = {"text": city, "type": "city", "limit": "1", "countrycodes": "nl", "lang": "en"}
         headers = {
-            "x-rapidapi-key": os.environ.get("RAPIDAPI_KEY", ""),
+            "x-rapidapi-key": RAPIDAPI_KEY,
             "x-rapidapi-host": "geocode-address-to-location.p.rapidapi.com"
         }
 

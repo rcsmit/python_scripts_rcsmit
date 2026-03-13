@@ -1,0 +1,10 @@
+# Copy this file to keys.py and fill in your actual values.
+# keys.py is in .gitignore and will NOT be committed.
+
+RAPIDAPI_KEY = ""
+GOOGLE_MAPS_API_KEY = ""
+TWITTER_BEARER_TOKEN = ""
+TWITTER_API_KEY = ""
+TWITTER_API_KEY_SECRET = ""
+GARMIN_USERNAME = ""
+GARMIN_PASSWORD = ""
