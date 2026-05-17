@@ -27,7 +27,7 @@ OUTPUT = "./netherlands_landcover.png"
 NL_WEST, NL_EAST   = 3.30, 7.30
 NL_SOUTH, NL_NORTH = 50.70, 53.65
 
-DOWNSAMPLE = 8   # increase if memory issues; decrease for sharper image
+DOWNSAMPLE = 2   # increase if memory issues; decrease for sharper image
 
 NL_TILES = ["N48E003", "N48E006", "N51E003", "N51E006"]
 
