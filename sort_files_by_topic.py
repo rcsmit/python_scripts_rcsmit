@@ -114,9 +114,11 @@ DEFAULT_TOPICS: list[str] = [
 # Supported file extensions
 # ---------------------------------------------------------------------------
 
+
+
 SUPPORTED_EXTENSIONS: set[str] = {
     ".pdf",
-    ".txt", ".rtf", ".csv",
+    ".txt", ".rtf", ".csv",".html",".htm"
     ".doc", ".docx",
     ".xls", ".xlsx",
     ".jpg", ".jpeg", ".png", ".tiff", ".tif", ".bmp", ".gif", ".webp",
@@ -424,7 +426,7 @@ def extract_text_from_file(file_path: Path, max_chars: int) -> str:
     try:
         if suffix == ".pdf":
             return _extract_pdf(file_path, max_chars)
-        elif suffix in (".txt", ".csv"):
+        elif suffix in (".txt", ".csv",".htm",".html"):
             return _extract_txt(file_path, max_chars)
         elif suffix == ".rtf":
             return _extract_rtf(file_path, max_chars)
