@@ -72,7 +72,7 @@ Unlike the Streamlit portfolio, this repo is the *workshop floor* — scripts th
 
 ---
 
-## 🌐 Web, Scraping & APIs
+## 🌐 Web, Scraping, Tools & APIs
 
 | Script | What it does |
 |---|---|
@@ -88,6 +88,9 @@ Unlike the Streamlit portfolio, this repo is the *workshop floor* — scripts th
 | [`fritsander_api_knmi.py`](fritsander_api_knmi.py) | Fetch KNMI data via Frits Ander's API wrapper |
 | [`garmin_connect.py`](garmin_connect.py) | Pull activity data from Garmin Connect |
 | [`speedtest.py`](speedtest.py) | Run an internet speed test from the command line |
+| [`sort_files_by_topic.py`](sort_files_by_topic.py) | Sort files by topic using AI |
+| [`crack_word_document.py`](crack_word_document.py) | Crack a word document |
+
 
 ---
 
