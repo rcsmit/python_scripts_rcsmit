@@ -3,7 +3,7 @@ sort_files_by_topic.py
 
 Sorts thousands of files into topic-based subdirectories using Claude AI.
 Supports PDF, TXT, RTF, DOC, DOCX, XLS, XLSX, CSV, and image files
-(JPG, JPEG, PNG, TIFF, BMP, GIF, WEBP — via OCR).
+(JPG, JPEG, PNG, TIFF, BMP, GIF, WEBP — via Claude Vision API, not OCR).
 
 Files with meaningless names (only digits, UUIDs, random char combos) are
 automatically renamed to a descriptive name suggested by Claude — at no
@@ -20,14 +20,13 @@ Override directories if needed:
     python sort_files_by_topic.py --input /other/dir --output /other/sorted
 
 Requirements:
-    pip install pdfplumber anthropic tqdm python-docx openpyxl pillow pytesseract striprtf
+    pip install pdfplumber anthropic tqdm python-docx openpyxl pillow striprtf
 
     For DOC (legacy Word) support:
         Linux/Mac: sudo apt install antiword  /  brew install antiword
 
-    For image OCR:
-        Mac:   brew install tesseract
-        Linux: sudo apt install tesseract-ocr
+    For image support (resize + format conversion before Vision API):
+        pip install pillow --break-system-packages  # required for all image types
 
 Environment:
     ANTHROPIC_API_KEY must be set.
@@ -48,6 +47,7 @@ import argparse
 import json
 import logging
 import os
+import random
 import re
 import shutil
 import subprocess
@@ -74,14 +74,11 @@ for _noisy in (
 # *** USER CONFIGURATION — edit these two lines, nothing else is required ***
 # ---------------------------------------------------------------------------
 
-# INPUT_DIR:  Path = Path(".")          # folder containing files to sort
-# OUTPUT_DIR: Path = Path("sorted")     # sorted files land here (created if needed)
+# INPUT_DIR:  Path = Path(r"C:\Users\rcxsm\Documents\docx")
+# OUTPUT_DIR: Path = Path(r"C:\Users\rcxsm\Documents\docx\sorted")
+INPUT_DIR:  Path = Path(r"C:\Users\rcxsm\Pictures\unsorted\to_sort")
+OUTPUT_DIR: Path = Path(r"C:\Users\rcxsm\Pictures\unsorted\sorted")
 
-
-# INPUT_DIR:  Path = Path(r"C:\Users\rcxsm\Downloads\pdf_ongesorteerd\pdfs")
-
-INPUT_DIR:  Path = Path(r"C:\Users\rcxsm\Downloads\xls ongesorteerd")
-OUTPUT_DIR:  Path = Path(r"C:\Users\rcxsm\Downloads\xls ongesorteerd\sorted")
 # ---------------------------------------------------------------------------
 # Topic list
 # ---------------------------------------------------------------------------
@@ -102,11 +99,15 @@ DEFAULT_TOPICS: list[str] = [
     "Travel & Tourism",
     "Art & Culture",
     "Spiritual & Yoga",
+    "Food & Beverage",
     "Service Quality",
     "Bank accounts",
     "Manuals",
-    "Tourism",
+    "Persons & groups",
     "Maps",
+    "Veganism",
+    "Covid",
+    "Hospitality & Catering",
     "Other",
 ]
 
@@ -114,11 +115,9 @@ DEFAULT_TOPICS: list[str] = [
 # Supported file extensions
 # ---------------------------------------------------------------------------
 
-
-
 SUPPORTED_EXTENSIONS: set[str] = {
     ".pdf",
-    ".txt", ".rtf", ".csv",".html",".htm"
+    ".txt", ".rtf", ".csv", ".html", ".htm",
     ".doc", ".docx",
     ".xls", ".xlsx",
     ".jpg", ".jpeg", ".png", ".tiff", ".tif", ".bmp", ".gif", ".webp",
@@ -135,7 +134,10 @@ BATCH_SIZE:          int   = 10       # files per API request
 MAX_WORKERS:         int   = 16       # parallel extraction threads
 API_RETRY_ATTEMPTS:  int   = 3
 API_RETRY_DELAY:     float = 5.0      # seconds between retries
-BATCH_POLL_INTERVAL: int   = 30       # seconds between batch status polls
+BATCH_POLL_INTERVAL: int   = 60       # seconds between batch status polls
+IMAGE_VISION_BATCH_SIZE: int = 20     # images per Claude Vision API call (max ~20)
+INTER_BATCH_DELAY_MIN:  float = 1.0   # min random pause between API calls (seconds)
+INTER_BATCH_DELAY_MAX:  float = 3.0   # max random pause between API calls (seconds)
 PROGRESS_FILE:       str   = "sort_progress.json"
 BATCH_STATE_FILE:    str   = "sort_batch_state.json"
 
@@ -217,20 +219,16 @@ def _is_bad_filename(stem: str) -> bool:
     """
     if not stem:
         return True
-    # Pure digits  (e.g. "1234567890")
     if stem.isdigit():
         return True
-    # UUID pattern  (with or without hyphens)
     if re.fullmatch(
         r"[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}",
         stem, re.I,
     ):
         return True
-    # Mostly non-alpha (less than 40% letters)
     letters = sum(c.isalpha() for c in stem)
     if len(stem) >= 4 and letters / len(stem) < 0.4:
         return True
-    # Short and no vowels  (e.g. "xkbf", "z7q3")
     if len(stem) <= 6 and not any(c in "aeiouAEIOU" for c in stem):
         return True
     return False
@@ -255,33 +253,12 @@ def _sanitize_suggested_name(raw: str) -> str:
 # ---------------------------------------------------------------------------
 
 def _extract_pdf(file_path: Path, max_chars: int) -> str:
-    """Extract text from the first PAGES_TO_EXTRACT pages via pdfplumber.
-
-    Args:
-        file_path: Path to the PDF.
-        max_chars: Maximum characters to return.
-
-    Returns:
-        Extracted text string.
-    """
     with pdfplumber.open(str(file_path)) as pdf:
         chunks = [page.extract_text() or "" for page in pdf.pages[:PAGES_TO_EXTRACT]]
     return "\n".join(chunks).strip()[:max_chars]
 
 
 def _extract_pdf_pdftotext(file_path: Path, max_chars: int) -> str:
-    """Extract text using the native pdftotext binary (faster alternative).
-
-    Requires poppler: brew install poppler / apt install poppler-utils.
-    Falls back to pdfplumber if not available.
-
-    Args:
-        file_path: Path to the PDF.
-        max_chars: Maximum characters to return.
-
-    Returns:
-        Extracted text string.
-    """
     try:
         result = subprocess.run(
             ["pdftotext", "-l", str(PAGES_TO_EXTRACT), str(file_path), "-"],
@@ -294,15 +271,6 @@ def _extract_pdf_pdftotext(file_path: Path, max_chars: int) -> str:
 
 
 def _extract_txt(file_path: Path, max_chars: int) -> str:
-    """Read a plain-text or CSV file, trying common encodings.
-
-    Args:
-        file_path: Path to the file.
-        max_chars: Maximum characters to return.
-
-    Returns:
-        File content string.
-    """
     for encoding in ("utf-8", "latin-1", "cp1252"):
         try:
             return file_path.read_text(encoding=encoding)[:max_chars]
@@ -312,30 +280,12 @@ def _extract_txt(file_path: Path, max_chars: int) -> str:
 
 
 def _extract_rtf(file_path: Path, max_chars: int) -> str:
-    """Extract plain text from an RTF file using striprtf.
-
-    Args:
-        file_path: Path to the RTF file.
-        max_chars: Maximum characters to return.
-
-    Returns:
-        Plain text content.
-    """
     from striprtf.striprtf import rtf_to_text  # type: ignore
     raw = file_path.read_text(encoding="latin-1")
     return rtf_to_text(raw)[:max_chars]
 
 
 def _extract_docx(file_path: Path, max_chars: int) -> str:
-    """Extract paragraph text from a DOCX file via python-docx.
-
-    Args:
-        file_path: Path to the DOCX file.
-        max_chars: Maximum characters to return.
-
-    Returns:
-        Paragraph text joined by newlines.
-    """
     import docx  # type: ignore
     doc = docx.Document(str(file_path))
     text = "\n".join(p.text for p in doc.paragraphs if p.text.strip())
@@ -343,17 +293,6 @@ def _extract_docx(file_path: Path, max_chars: int) -> str:
 
 
 def _extract_doc(file_path: Path, max_chars: int) -> str:
-    """Extract text from a legacy DOC file via antiword.
-
-    Falls back to empty string if antiword is not installed.
-
-    Args:
-        file_path: Path to the DOC file.
-        max_chars: Maximum characters to return.
-
-    Returns:
-        Extracted text string.
-    """
     try:
         result = subprocess.run(
             ["antiword", str(file_path)],
@@ -361,44 +300,26 @@ def _extract_doc(file_path: Path, max_chars: int) -> str:
         )
         return result.stdout.strip()[:max_chars]
     except FileNotFoundError:
+        print("antiword not found; cannot extract .doc: %s", file_path.name)
         log.debug("antiword not found; cannot extract .doc: %s", file_path.name)
         return ""
 
 
 def _extract_xlsx(file_path: Path, max_chars: int) -> str:
-    """Extract cell values from the first 3 sheets (50 rows each) of an XLSX.
-
-    Args:
-        file_path: Path to the XLSX/XLS file.
-        max_chars: Maximum characters to return.
-
-    Returns:
-        Tab/newline separated cell values.
-    """
+    number_of_sheets = 1
     import openpyxl  # type: ignore
     wb = openpyxl.load_workbook(str(file_path), read_only=True, data_only=True)
     chunks: list[str] = []
-    for sheet in wb.worksheets[:3]:
+    for sheet in wb.worksheets[:number_of_sheets]:
         for row in sheet.iter_rows(max_row=50, values_only=True):
             row_text = "  ".join(str(c) for c in row if c is not None)
             if row_text.strip():
                 chunks.append(row_text)
     return "\n".join(chunks)[:max_chars]
 
+def _extract_image_with_pytesseract(file_path: Path, max_chars: int) -> str:
+    """ Not used """
 
-def _extract_image(file_path: Path, max_chars: int) -> str:
-    """Extract text from an image via Tesseract OCR.
-
-    Requires: pip install pillow pytesseract
-    And: brew install tesseract / apt install tesseract-ocr
-
-    Args:
-        file_path: Path to the image file.
-        max_chars: Maximum characters to return.
-
-    Returns:
-        OCR text string, or empty string if tesseract is unavailable.
-    """
     try:
         import pytesseract          # type: ignore
         from PIL import Image       # type: ignore
@@ -412,21 +333,243 @@ def _extract_image(file_path: Path, max_chars: int) -> str:
         return ""
 
 
-def extract_text_from_file(file_path: Path, max_chars: int) -> str:
-    """Dispatch text extraction to the correct handler based on file extension.
+def _extract_image(file_path: Path, max_chars: int) -> str:
+    """Return a sentinel so the pipeline knows this is an image file.
+
+    Images are classified via Claude Vision (not OCR), so we return a
+    placeholder that signals the image path.  The actual vision call is made
+    in classify_images_standard() / classify_images_batch_inline().
+    """
+    return f"__IMAGE_FILE__:{file_path}"
+
+
+# ---------------------------------------------------------------------------
+# Image description helpers  (max 50-char prefix + topic in one vision call)
+# ---------------------------------------------------------------------------
+
+IMAGE_EXTENSIONS: frozenset[str] = frozenset(
+    {".jpg", ".jpeg", ".png", ".tiff", ".tif", ".bmp", ".gif", ".webp"}
+)
+
+_MEDIA_TYPE_MAP: dict[str, str] = {
+    ".jpg":  "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png":  "image/png",
+    ".gif":  "image/gif",
+    ".webp": "image/webp",
+    ".tiff": "image/jpeg",   # convert below
+    ".tif":  "image/jpeg",
+    ".bmp":  "image/jpeg",
+}
+
+
+# Anthropic API rejects images larger than ~5 MB (base64-encoded).
+# We resize to fit within this budget using Pillow before encoding.
+_MAX_IMAGE_BYTES: int   = 4_500_000   # 4.5 MB base64 budget (conservative)
+_MAX_IMAGE_DIM:   int   = 1568        # max long-edge in pixels (good quality, small size)
+
+
+def _image_to_base64(file_path: Path) -> tuple[str, str]:
+    """Return (base64_data, media_type) for an image file.
+
+    All images are processed through Pillow so we can:
+      - Resize large images to fit within the API size limit
+      - Convert TIFF / BMP (not accepted by the API) to JPEG
+      - Re-compress oversized JPEGs iteratively until they fit
 
     Args:
-        file_path: Path to the file.
-        max_chars: Maximum characters to return.
+        file_path: Path to the image file.
 
     Returns:
-        Extracted text string, possibly empty if unreadable or unsupported.
+        Tuple of (base64-encoded bytes as str, MIME type string).
+
+    Raises:
+        ImportError: If Pillow is not installed.
+        OSError: If the file cannot be read or converted.
     """
+    import base64
+    import io
+    from PIL import Image as _PILImage  # type: ignore
+
+    img = _PILImage.open(str(file_path)).convert("RGB")
+
+    # Resize if the long edge exceeds the limit
+    w, h = img.size
+    long_edge = max(w, h)
+    if long_edge > _MAX_IMAGE_DIM:
+        scale = _MAX_IMAGE_DIM / long_edge
+        img = img.resize((int(w * scale), int(h * scale)), _PILImage.LANCZOS)
+
+    # Encode to JPEG and iteratively reduce quality until size fits
+    quality = 85
+    while quality >= 30:
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=quality)
+        encoded = base64.b64encode(buf.getvalue()).decode()
+        if len(encoded) <= _MAX_IMAGE_BYTES:
+            return encoded, "image/jpeg"
+        quality -= 10
+
+    # Last resort: halve the resolution once more
+    img = img.resize((img.width // 2, img.height // 2), _PILImage.LANCZOS)
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=60)
+    return base64.b64encode(buf.getvalue()).decode(), "image/jpeg"
+
+
+def _vision_classify_batch(
+    client: anthropic.Anthropic,
+    records: list["FileRecord"],
+    topics: list[str],
+    retries: int,
+    retry_delay: float,
+) -> None:
+    """Classify a batch of image FileRecords via Claude Vision in one API call.
+
+    Sends all images in a single multi-image message.  Each image gets:
+      - A topic from the allowed list
+      - A short_description (≤50 chars, plain language, no quotes) that is used
+        as a filename prefix when the original filename is meaningless.
+
+    Results are written back into each record's .topic and .new_name fields.
+
+    Args:
+        client:      Anthropic client.
+        records:     Image FileRecords whose .text starts with '__IMAGE_FILE__:'.
+        topics:      Allowed topic strings.
+        retries:     Number of retry attempts on API failure.
+        retry_delay: Seconds to wait between retries.
+    """
+    if not records:
+        return
+
+    topic_list = "\n".join(f"- {t}" for t in topics)
+    content: list[dict] = []
+
+    # Build multi-image message
+    for i, record in enumerate(records):
+        try:
+            b64, media_type = _image_to_base64(record.path)
+        except Exception as exc:
+            log.warning("Cannot encode image %s: %s", record.path.name, exc)
+            record.error = "image_encode_failed"
+            record.topic = "Other"
+            continue
+
+        content.append({
+            "type": "text",
+            "text": (
+                f"Image {i} — filename: {record.path.name}"
+                + ("  [NEEDS_RENAME]" if _is_bad_filename(record.path.stem) else "")
+            ),
+        })
+        content.append({
+            "type": "image",
+            "source": {"type": "base64", "media_type": media_type, "data": b64},
+        })
+
+    content.append({
+        "type": "text",
+        "text": (
+            "You are an image classifier.\n\n"
+            f"Allowed topics:\n{topic_list}\n\n"
+            "For EACH image above return a JSON object with:\n"
+            '  "index"             : integer (same order as shown above)\n'
+            '  "topic"             : exactly one topic from the allowed list\n'
+            '  "short_description" : max 50 characters, plain language description of '
+            "what the image shows — always required for every image. "
+            "No quotes, no special chars, lowercase, suitable as a filename prefix "
+            "(e.g. 'sunset over amsterdam canal', 'dog playing in snow').\n\n"
+            "Return ONLY a JSON array — no markdown, no explanation.\n"
+            "Example: "
+            '[{"index":0,"topic":"Travel & Tourism","short_description":"sunset over amsterdam canal"}]'
+        ),
+    })
+
+    for attempt in range(1, retries + 1):
+        try:
+            response = client.messages.create(
+                model=MODEL,
+                max_tokens=512,
+                messages=[{"role": "user", "content": content}],
+            )
+            raw = ""
+            if response.content and hasattr(response.content[0], "text"):
+                raw = response.content[0].text
+
+            if not raw:
+                log.warning("Vision classify attempt %d/%d: empty response.", attempt, retries)
+                if attempt < retries:
+                    time.sleep(retry_delay)
+                continue
+
+            try:
+                results = _extract_json_array(raw)
+            except (ValueError, json.JSONDecodeError) as exc:
+                log.warning("Vision parse attempt %d/%d: %s", attempt, retries, exc)
+                if attempt < retries:
+                    time.sleep(retry_delay)
+                continue
+
+            for item in results:
+                if not isinstance(item, dict):
+                    continue
+                try:
+                    idx = int(item["index"])
+                except (KeyError, ValueError, TypeError):
+                    continue
+                if idx < 0 or idx >= len(records):
+                    continue
+
+                topic = str(item.get("topic", "")).strip()
+                if not topic:
+                    topic = "Other"
+                elif topic not in topics:
+                    topic = _best_match(topic, topics)
+                records[idx].topic = topic
+
+                desc = item.get("short_description", "")
+                if desc:
+                    clean_desc = _sanitize_suggested_name(str(desc))
+                    orig_stem  = records[idx].path.stem
+                    if _is_bad_filename(orig_stem):
+                        # Bad name: replace entirely with description
+                        records[idx].new_name = clean_desc[:50]
+                    else:
+                        # Good name: prepend description as prefix
+                        records[idx].new_name = f"{clean_desc[:30]}_{orig_stem}"[:80]
+
+            # Fill in any records that didn't get a result
+            for record in records:
+                if not record.topic:
+                    record.topic = "Other"
+            return
+
+        except anthropic.RateLimitError:
+            log.warning(
+                "Rate limited on vision call; waiting %.0fs (attempt %d/%d)",
+                retry_delay * 2, attempt, retries,
+            )
+            time.sleep(retry_delay * 2)
+        except anthropic.APIStatusError as exc:
+            log.warning("Vision API error %s attempt %d/%d", exc.status_code, attempt, retries)
+            time.sleep(retry_delay)
+        if attempt < retries:
+            time.sleep(retry_delay)
+
+    for record in records:
+        if not record.topic:
+            record.error = "classification_failed"
+            record.topic = "Other"
+
+
+def extract_text_from_file(file_path: Path, max_chars: int) -> str:
+    """Dispatch text extraction to the correct handler based on file extension."""
     suffix = file_path.suffix.lower()
     try:
         if suffix == ".pdf":
             return _extract_pdf(file_path, max_chars)
-        elif suffix in (".txt", ".csv",".htm",".html"):
+        elif suffix in (".txt", ".csv", ".htm", ".html"):
             return _extract_txt(file_path, max_chars)
         elif suffix == ".rtf":
             return _extract_rtf(file_path, max_chars)
@@ -443,19 +586,12 @@ def extract_text_from_file(file_path: Path, max_chars: int) -> str:
     return ""
 
 
-
 # ---------------------------------------------------------------------------
 # Parallel extraction
 # ---------------------------------------------------------------------------
 
 def extract_texts_parallel(records: list[FileRecord], max_chars: int, workers: int) -> None:
-    """Fill FileRecord.text for each record in-place using a thread pool.
-
-    Args:
-        records:   List of FileRecord objects to populate.
-        max_chars: Passed through to extract_text_from_file.
-        workers:   Number of parallel threads.
-    """
+    """Fill FileRecord.text for each record in-place using a thread pool."""
     def _extract(record: FileRecord) -> None:
         record.text = extract_text_from_file(record.path, max_chars)
         if not record.text:
@@ -473,23 +609,15 @@ def extract_texts_parallel(records: list[FileRecord], max_chars: int, workers: i
 # ---------------------------------------------------------------------------
 
 def build_classification_prompt(batch: list[FileRecord], topics: list[str]) -> str:
-    """Build the classification prompt, requesting a suggested name for bad filenames.
-
-    Args:
-        batch:  FileRecord objects with text populated.
-        topics: Allowed topic label strings.
-
-    Returns:
-        Formatted prompt string.
-    """
+    """Build the classification prompt, requesting a suggested name for bad filenames."""
     topic_list = "\n".join(f"- {t}" for t in topics)
     needs_rename = any(_is_bad_filename(r.path.stem) for r in batch)
 
     entries: list[str] = []
     for i, record in enumerate(batch):
-        snippet  = record.text if record.text else "(no text extracted)"
-        ext      = record.path.suffix.upper()
-        tag      = " [NEEDS_RENAME]" if _is_bad_filename(record.path.stem) else ""
+        snippet = record.text if record.text else "(no text extracted)"
+        ext     = record.path.suffix.upper()
+        tag     = " [NEEDS_RENAME]" if _is_bad_filename(record.path.stem) else ""
         entries.append(f"### File {i} [{ext}]{tag}\nFilename: {record.path.name}\n\n{snippet}")
     docs_block = "\n\n".join(entries)
 
@@ -512,6 +640,60 @@ def build_classification_prompt(batch: list[FileRecord], topics: list[str]) -> s
 
 
 # ---------------------------------------------------------------------------
+# JSON extraction helper
+# ---------------------------------------------------------------------------
+
+def _extract_json_array(raw: str) -> list[dict]:
+    """Robustly extract a JSON array from Claude's response.
+
+    Handles: raw JSON, ```json fences, leading/trailing prose, partial wrapping.
+
+    Args:
+        raw: Raw text from Claude.
+
+    Returns:
+        Parsed list of dicts.
+
+    Raises:
+        ValueError: If no valid JSON array can be extracted.
+    """
+    text = raw.strip()
+
+    # Strip ```json ... ``` fences
+    if "```" in text:
+        parts = text.split("```")
+        for part in parts:
+            candidate = part.strip()
+            if candidate.startswith("json"):
+                candidate = candidate[4:].strip()
+            if candidate.startswith("["):
+                text = candidate
+                break
+
+    # Try the whole string first
+    if text.startswith("["):
+        try:
+            result = json.loads(text)
+            if isinstance(result, list):
+                return result
+        except json.JSONDecodeError:
+            pass
+
+    # Find the first '[' ... last ']' bracket pair
+    start = text.find("[")
+    end   = text.rfind("]")
+    if start != -1 and end != -1 and end > start:
+        try:
+            result = json.loads(text[start : end + 1])
+            if isinstance(result, list):
+                return result
+        except json.JSONDecodeError:
+            pass
+
+    raise ValueError(f"No valid JSON array found in response (length {len(raw)}): {raw[:200]!r}")
+
+
+# ---------------------------------------------------------------------------
 # Response parser
 # ---------------------------------------------------------------------------
 
@@ -528,37 +710,56 @@ def _parse_classification_response(
         topics: Allowed topic strings for validation.
 
     Returns:
-        True if parsing succeeded.
+        True if parsing succeeded; False if the response was unparseable.
     """
-    text = raw.strip()
-    if text.startswith("```"):
-        parts = text.split("```")
-        text = parts[1] if len(parts) > 1 else text
-        if text.startswith("json"):
-            text = text[4:]
+    try:
+        results = _extract_json_array(raw)
+    except (ValueError, json.JSONDecodeError) as exc:
+        log.warning("Could not parse classification response: %s", exc)
+        return False
 
-    results: list[dict] = json.loads(text.strip())
+    if not isinstance(results, list) or not results:
+        log.warning("Classification response is not a non-empty list.")
+        return False
+
+    parsed_count = 0
     for item in results:
-        idx: int = int(item["index"])
-        topic: str = item["topic"].strip()
-        if topic not in topics:
+        if not isinstance(item, dict):
+            log.warning("Skipping non-dict item in classification response: %r", item)
+            continue
+        try:
+            idx: int = int(item["index"])
+        except (KeyError, ValueError, TypeError):
+            log.warning("Skipping item with missing/bad 'index': %r", item)
+            continue
+        if idx < 0 or idx >= len(batch):
+            log.warning("Index %d out of range for batch of size %d; skipping.", idx, len(batch))
+            continue
+
+        topic = str(item.get("topic", "")).strip()
+        if not topic:
+            log.warning("Empty topic for index %d; defaulting to 'Other'.", idx)
+            topic = "Other"
+        elif topic not in topics:
             topic = _best_match(topic, topics)
+
         batch[idx].topic = topic
-        if "suggested_name" in item:
-            batch[idx].new_name = _sanitize_suggested_name(str(item["suggested_name"]))
+
+        suggested = item.get("suggested_name")
+        if suggested:
+            batch[idx].new_name = _sanitize_suggested_name(str(suggested))
+
+        parsed_count += 1
+
+    if parsed_count == 0:
+        log.warning("Classification response parsed 0 valid items.")
+        return False
+
     return True
 
 
 def _best_match(topic: str, allowed: list[str]) -> str:
-    """Return the best-matching allowed topic via case-insensitive substring.
-
-    Args:
-        topic:   Returned topic not in the allowed list.
-        allowed: Valid topic strings.
-
-    Returns:
-        Best matching allowed topic, or 'Other' as fallback.
-    """
+    """Return the best-matching allowed topic via case-insensitive substring."""
     topic_lower = topic.lower()
     for candidate in allowed:
         if topic_lower in candidate.lower() or candidate.lower() in topic_lower:
@@ -577,15 +778,7 @@ def classify_batch_standard(
     retries: int,
     retry_delay: float,
 ) -> None:
-    """Classify a batch via the synchronous Messages API.
-
-    Args:
-        client:      Anthropic client instance.
-        batch:       FileRecord list to classify in-place.
-        topics:      Allowed topic strings.
-        retries:     Number of retry attempts on transient failure.
-        retry_delay: Seconds to wait between retries.
-    """
+    """Classify a batch via the synchronous Messages API."""
     prompt = build_classification_prompt(batch, topics)
 
     for attempt in range(1, retries + 1):
@@ -595,8 +788,12 @@ def classify_batch_standard(
                 max_tokens=512,
                 messages=[{"role": "user", "content": prompt}],
             )
-            if _parse_classification_response(response.content[0].text, batch, topics):
+            raw = ""
+            if response.content and hasattr(response.content[0], "text"):
+                raw = response.content[0].text
+            if raw and _parse_classification_response(raw, batch, topics):
                 return
+            log.warning("Classify attempt %d/%d: empty or unparseable response.", attempt, retries)
         except (json.JSONDecodeError, KeyError, IndexError, ValueError) as exc:
             log.warning("Parse error attempt %d/%d: %s", attempt, retries, exc)
         except anthropic.RateLimitError:
@@ -623,16 +820,7 @@ def build_batch_requests(
     topics: list[str],
     batch_size: int,
 ) -> list[dict]:
-    """Build Batch API request dicts; assign custom_ids to all records.
-
-    Args:
-        all_records: FileRecord objects with text populated.
-        topics:      Allowed topic strings.
-        batch_size:  Files per sub-batch request.
-
-    Returns:
-        List of request dicts for client.beta.messages.batches.create().
-    """
+    """Build Batch API request dicts; assign custom_ids to all records."""
     requests: list[dict] = []
     sub_batches = [all_records[i: i + batch_size] for i in range(0, len(all_records), batch_size)]
     for sub_idx, sub_batch in enumerate(sub_batches):
@@ -657,18 +845,7 @@ def submit_batch(
     batch_size: int,
     state_path: Path,
 ) -> str:
-    """Submit all requests to the Batch API and save state for collect phase.
-
-    Args:
-        client:      Anthropic client instance.
-        all_records: Records with text extracted.
-        topics:      Allowed topic strings.
-        batch_size:  Files per sub-batch request.
-        state_path:  Path to write the batch state JSON.
-
-    Returns:
-        Anthropic batch ID string.
-    """
+    """Submit all requests to the Batch API and save state for collect phase."""
     log.info("Building batch requests…")
     requests = build_batch_requests(all_records, topics, batch_size)
     log.info("Submitting %d requests to Batch API…", len(requests))
@@ -692,13 +869,7 @@ def submit_batch(
 # ---------------------------------------------------------------------------
 
 def poll_batch_until_done(client: anthropic.Anthropic, batch_id: str, poll_interval: int) -> None:
-    """Block until the batch reaches the 'ended' status.
-
-    Args:
-        client:        Anthropic client instance.
-        batch_id:      Batch ID to poll.
-        poll_interval: Seconds between status checks.
-    """
+    """Block until the batch reaches the 'ended' status."""
     log.info("Polling batch %s every %ds…", batch_id, poll_interval)
     while True:
         batch  = client.beta.messages.batches.retrieve(batch_id)
@@ -721,25 +892,17 @@ def collect_batch_results(
     id_to_path: dict[str, str],
     batch_size: int,
 ) -> dict[str, tuple[str, str]]:
-    """Retrieve batch results; return path → (topic, new_name) mapping.
-
-    Args:
-        client:     Anthropic client instance.
-        batch_id:   Batch ID to retrieve.
-        topics:     Allowed topic strings.
-        id_to_path: custom_id → absolute path string (from state file).
-        batch_size: Files per sub-batch (for reconstructing record order).
-
-    Returns:
-        Dict mapping absolute path strings to (topic, new_name) tuples.
-        new_name is an empty string when no rename was suggested.
-    """
+    """Retrieve batch results; return path → (topic, new_name) mapping."""
     # Reconstruct sub-batch structure
     sub_batches: dict[int, list[tuple[int, str, str]]] = {}
     for custom_id, abs_path in id_to_path.items():
-        parts   = custom_id.split("_")
-        sub_idx = int(parts[0][3:])
-        rec_idx = int(parts[1][3:])
+        try:
+            parts   = custom_id.split("_")
+            sub_idx = int(parts[0][3:])
+            rec_idx = int(parts[1][3:])
+        except (IndexError, ValueError):
+            log.warning("Malformed custom_id %r in state file; skipping.", custom_id)
+            continue
         sub_batches.setdefault(sub_idx, []).append((rec_idx, custom_id, abs_path))
 
     ordered: dict[int, list[tuple[int, str, str]]] = {
@@ -752,7 +915,11 @@ def collect_batch_results(
 
     for result in client.beta.messages.batches.results(batch_id):
         sub_id  = result.custom_id
-        sub_idx = int(sub_id[3:])
+        try:
+            sub_idx = int(sub_id[3:])
+        except (ValueError, IndexError):
+            log.warning("Malformed sub_id %r in batch results; skipping.", sub_id)
+            continue
 
         if result.result.type != "succeeded":
             log.warning("Sub-batch %s failed: %s", sub_id, result.result.type)
@@ -760,19 +927,33 @@ def collect_batch_results(
                 path_to_result[path] = ("Other", "")
             continue
 
-        raw          = result.result.message.content[0].text
+        # Safely extract text from response
+        raw = ""
+        try:
+            content = result.result.message.content
+            if content and hasattr(content[0], "text"):
+                raw = content[0].text
+        except (AttributeError, IndexError, TypeError) as exc:
+            log.warning("Could not read content from sub-batch %s: %s", sub_id, exc)
+
         sub_entries  = ordered.get(sub_idx, [])
         stub_records = [FileRecord(path=Path(p), custom_id=cid) for _, cid, p in sub_entries]
 
-        try:
-            _parse_classification_response(raw, stub_records, topics)
-            for record in stub_records:
-                path_to_result[str(record.path.resolve())] = (record.topic or "Other", record.new_name)
-                result_count += 1
-        except (json.JSONDecodeError, KeyError, IndexError, ValueError) as exc:
-            log.warning("Parse error sub-batch %s: %s", sub_id, exc)
+        if not raw:
+            log.warning("Empty response for sub-batch %s; defaulting all to 'Other'.", sub_id)
             for record in stub_records:
                 path_to_result[str(record.path.resolve())] = ("Other", "")
+            continue
+
+        success = _parse_classification_response(raw, stub_records, topics)
+        if not success:
+            log.warning("Parse failed for sub-batch %s; defaulting all to 'Other'.", sub_id)
+
+        for record in stub_records:
+            # topic is "" if parse failed for that record — fall back to "Other"
+            topic = record.topic if record.topic else "Other"
+            path_to_result[str(record.path.resolve())] = (topic, record.new_name)
+            result_count += 1
 
     log.info("Collected results for %d files.", result_count)
     return path_to_result
@@ -783,14 +964,7 @@ def collect_batch_results(
 # ---------------------------------------------------------------------------
 
 def sanitize_folder_name(topic: str) -> str:
-    """Convert a topic string to a filesystem-safe directory name.
-
-    Args:
-        topic: Raw topic string.
-
-    Returns:
-        Safe folder name.
-    """
+    """Convert a topic string to a filesystem-safe directory name."""
     for ch in r'/\:*?"<>|&':
         topic = topic.replace(ch, "_")
     return topic.strip().strip(".")
@@ -802,24 +976,13 @@ def move_or_copy_file(
     copy: bool,
     dry_run: bool,
 ) -> bool:
-    """Move or copy a file into its topic subfolder, applying rename if set.
-
-    Args:
-        record:     FileRecord with topic and optional new_name.
-        output_dir: Root output directory.
-        copy:       Copy instead of move.
-        dry_run:    Preview only; do not touch files.
-
-    Returns:
-        True if the operation succeeded (or would succeed in dry-run).
-    """
+    """Move or copy a file into its topic subfolder, applying rename if set."""
     folder_name = sanitize_folder_name(record.topic)
     dest_dir    = output_dir / folder_name
 
-    filename = (record.new_name + record.path.suffix) if record.new_name else record.path.name
+    filename  = (record.new_name + record.path.suffix) if record.new_name else record.path.name
     dest_path = dest_dir / filename
 
-    # Resolve filename collisions
     if dest_path.exists() and not dry_run:
         stem    = Path(filename).stem
         suffix  = record.path.suffix
@@ -829,7 +992,7 @@ def move_or_copy_file(
             counter  += 1
 
     if dry_run:
-        action = "COPY" if copy else "MOVE"
+        action      = "COPY" if copy else "MOVE"
         rename_note = f" → {filename}" if record.new_name else ""
         log.debug("%s [DRY-RUN] %s%s -> %s/", action, record.path.name, rename_note, folder_name)
         return True
@@ -854,35 +1017,23 @@ def apply_topics_and_move(
     done: dict[str, str],
     progress_path: Path,
 ) -> SortStats:
-    """Move/copy all files based on path→(topic, new_name); update progress.
-
-    Args:
-        path_to_result: Mapping of absolute paths to (topic, new_name) tuples.
-        output_dir:     Root output directory.
-        copy:           Copy instead of move.
-        dry_run:        Preview only.
-        done:           Existing progress dict, updated in-place.
-        progress_path:  Path to persist updated progress.
-
-    Returns:
-        SortStats with move counts and per-topic/type breakdown.
-    """
+    """Move/copy all files based on path→(topic, new_name); update progress."""
     stats       = SortStats()
     stats.total = len(path_to_result)
 
     for abs_path_str, (topic, new_name) in tqdm(
         path_to_result.items(), desc="Moving files", unit="file"
     ):
-        record = FileRecord(path=Path(abs_path_str), topic=topic, new_name=new_name)
+        record  = FileRecord(path=Path(abs_path_str), topic=topic, new_name=new_name)
         success = move_or_copy_file(record, output_dir, copy=copy, dry_run=dry_run)
         if success:
-            stats.moved  += 1
+            stats.moved      += 1
             stats.classified += 1
             if new_name:
                 stats.renamed += 1
-            stats.topic_counts[topic] = stats.topic_counts.get(topic, 0) + 1
-            ext = record.path.suffix.lower()
-            stats.type_counts[ext]  = stats.type_counts.get(ext, 0) + 1
+            stats.topic_counts[topic]                    = stats.topic_counts.get(topic, 0) + 1
+            ext                                          = record.path.suffix.lower()
+            stats.type_counts[ext]                       = stats.type_counts.get(ext, 0) + 1
             if not dry_run:
                 done[abs_path_str] = topic
         else:
@@ -902,30 +1053,21 @@ def apply_topics_and_move(
 # ---------------------------------------------------------------------------
 
 def load_progress(progress_path: Path) -> dict[str, str]:
-    """Load previously completed path→topic mappings from disk.
-
-    Args:
-        progress_path: Path to the JSON progress file.
-
-    Returns:
-        Dict mapping absolute path strings to topic strings.
-    """
+    """Load previously completed path→topic mappings from disk."""
     if progress_path.exists():
         try:
             with open(progress_path, "r", encoding="utf-8") as fh:
-                return json.load(fh)
-        except (json.JSONDecodeError, OSError):
-            log.warning("Could not read progress file; starting fresh.")
+                data = json.load(fh)
+            if isinstance(data, dict):
+                return data
+            log.warning("Progress file has unexpected format; starting fresh.")
+        except (json.JSONDecodeError, OSError) as exc:
+            log.warning("Could not read progress file (%s); starting fresh.", exc)
     return {}
 
 
 def save_progress(progress_path: Path, done: dict[str, str]) -> None:
-    """Persist completed path→topic mappings to disk.
-
-    Args:
-        progress_path: Path to write the JSON progress file.
-        done:          Dict mapping absolute path strings to topic strings.
-    """
+    """Persist completed path→topic mappings to disk."""
     try:
         with open(progress_path, "w", encoding="utf-8") as fh:
             json.dump(done, fh, indent=2)
@@ -943,21 +1085,38 @@ def load_batch_state(state_path: Path) -> dict:
         Dict with keys: batch_id, topics, batch_size, id_to_path.
 
     Raises:
-        SystemExit: If the state file is missing or unreadable.
+        FileNotFoundError: If the state file does not exist.
+        ValueError: If the file contains invalid JSON or unexpected structure.
+        OSError: If the file cannot be read.
     """
     if not state_path.exists():
-        log.error(
-            "Batch state file not found: %s\n"
-            "  → Run submit phase first (without --collect).",
-            state_path,
+        raise FileNotFoundError(
+            f"Batch state file not found: {state_path}\n"
+            "  → Run submit phase first (without --collect)."
         )
-        raise SystemExit(1)
     try:
         with open(state_path, "r", encoding="utf-8") as fh:
-            return json.load(fh)
-    except (json.JSONDecodeError, OSError) as exc:
-        log.error("Could not read batch state: %s", exc)
-        raise SystemExit(1)
+            data = json.load(fh)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Batch state file contains invalid JSON: {exc}") from exc
+    except OSError as exc:
+        raise OSError(f"Could not read batch state file: {exc}") from exc
+
+    # Validate required keys so callers don't get surprise KeyErrors later
+    required = {"batch_id", "topics", "batch_size", "id_to_path"}
+    missing  = required - data.keys()
+    if missing:
+        raise ValueError(
+            f"Batch state file is missing required keys: {', '.join(sorted(missing))}"
+        )
+    if not isinstance(data["batch_id"], str) or not data["batch_id"]:
+        raise ValueError("Batch state 'batch_id' is empty or not a string.")
+    if not isinstance(data["topics"], list):
+        raise ValueError("Batch state 'topics' must be a list.")
+    if not isinstance(data["id_to_path"], dict):
+        raise ValueError("Batch state 'id_to_path' must be a dict.")
+
+    return data
 
 
 # ---------------------------------------------------------------------------
@@ -965,14 +1124,7 @@ def load_batch_state(state_path: Path) -> dict:
 # ---------------------------------------------------------------------------
 
 def collect_files(input_dir: Path) -> list[Path]:
-    """Recursively find all supported files under input_dir.
-
-    Args:
-        input_dir: Root directory to search.
-
-    Returns:
-        Sorted list of absolute file paths with supported extensions.
-    """
+    """Recursively find all supported files under input_dir."""
     return sorted(
         p for p in input_dir.rglob("*")
         if p.is_file() and p.suffix.lower() in SUPPORTED_EXTENSIONS
@@ -992,21 +1144,8 @@ def run_standard_pipeline(
     batch_size: int,
     workers: int,
 ) -> SortStats:
-    """Standard pipeline: discover → extract → classify (real-time) → move.
-
-    Args:
-        input_dir:  Source directory.
-        output_dir: Destination root directory.
-        topics:     Allowed topic labels.
-        dry_run:    Preview mode.
-        copy:       Copy instead of move.
-        batch_size: Files per API call.
-        workers:    Parallel extraction threads.
-
-    Returns:
-        SortStats with final counts.
-    """
-    stats = SortStats()
+    """Standard pipeline: discover → extract → classify (real-time) → move."""
+    stats  = SortStats()
     client = _get_client()
 
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -1030,15 +1169,43 @@ def run_standard_pipeline(
         log.info("Nothing to do.")
         return stats
 
-    log.info("Extracting text using %d threads…", workers)
-    extract_texts_parallel(pending, MAX_CHARS_PER_FILE, workers)
+    # Split early: images use Vision API, text files use text extraction + classify
+    image_records = [r for r in pending if r.path.suffix.lower() in IMAGE_EXTENSIONS]
+    text_records  = [r for r in pending if r.path.suffix.lower() not in IMAGE_EXTENSIONS]
 
-    batches = [pending[i: i + batch_size] for i in range(0, len(pending), batch_size)]
-    log.info("Classifying %d batches via standard API…", len(batches))
-    for batch in tqdm(batches, desc="Classifying", unit="batch"):
-        classify_batch_standard(client, batch, topics, API_RETRY_ATTEMPTS, API_RETRY_DELAY)
-        stats.classified += sum(1 for r in batch if r.topic and r.error != "classification_failed")
-        stats.failed     += sum(1 for r in batch if r.error == "classification_failed")
+    if text_records:
+        log.info("Extracting text from %d files using %d threads…", len(text_records), workers)
+        extract_texts_parallel(text_records, MAX_CHARS_PER_FILE, workers)
+    if image_records:
+        log.info("Skipping text extraction for %d image files — using Claude Vision instead.", len(image_records))
+
+    # Classify text-based files
+    if text_records:
+        batches = [text_records[i: i + batch_size] for i in range(0, len(text_records), batch_size)]
+        log.info("Classifying %d text batches via standard API…", len(batches))
+        for i, batch in enumerate(tqdm(batches, desc="Classifying text", unit="batch")):
+            classify_batch_standard(client, batch, topics, API_RETRY_ATTEMPTS, API_RETRY_DELAY)
+            stats.classified += sum(1 for r in batch if r.topic and r.error != "classification_failed")
+            stats.failed     += sum(1 for r in batch if r.error == "classification_failed")
+            if i < len(batches) - 1:
+                time.sleep(random.uniform(INTER_BATCH_DELAY_MIN, INTER_BATCH_DELAY_MAX))
+
+    # Classify images via Claude Vision (real-time, batches of IMAGE_VISION_BATCH_SIZE)
+    if image_records:
+        img_batches = [
+            image_records[i: i + IMAGE_VISION_BATCH_SIZE]
+            for i in range(0, len(image_records), IMAGE_VISION_BATCH_SIZE)
+        ]
+        log.info(
+            "Classifying %d images in %d vision batches (batch size %d)…",
+            len(image_records), len(img_batches), IMAGE_VISION_BATCH_SIZE,
+        )
+        for i, img_batch in enumerate(tqdm(img_batches, desc="Classifying images", unit="batch")):
+            _vision_classify_batch(client, img_batch, topics, API_RETRY_ATTEMPTS, API_RETRY_DELAY)
+            stats.classified += sum(1 for r in img_batch if r.topic and r.error != "classification_failed")
+            stats.failed     += sum(1 for r in img_batch if r.error == "classification_failed")
+            if i < len(img_batches) - 1:
+                time.sleep(random.uniform(INTER_BATCH_DELAY_MIN, INTER_BATCH_DELAY_MAX))
 
     log.info("Moving files%s…", " [DRY-RUN]" if dry_run else "")
     for record in tqdm(pending, desc="Moving files", unit="file"):
@@ -1071,19 +1238,9 @@ def run_batch_submit_phase(
     topics: list[str],
     batch_size: int,
     workers: int,
+    dry_run: bool = False,
 ) -> str:
-    """Batch phase 1: extract text and submit to Batch API.
-
-    Args:
-        input_dir:  Source directory.
-        output_dir: Output/state directory.
-        topics:     Allowed topic labels.
-        batch_size: Files per sub-batch request.
-        workers:    Parallel extraction threads.
-
-    Returns:
-        Anthropic batch ID, or empty string if nothing to submit.
-    """
+    """Batch phase 1: extract text, classify images via Vision, submit text files to Batch API."""
     client = _get_client()
     output_dir.mkdir(parents=True, exist_ok=True)
     progress_path = output_dir / PROGRESS_FILE
@@ -1107,10 +1264,62 @@ def run_batch_submit_phase(
         log.info("Nothing to submit.")
         return ""
 
-    log.info("Extracting text using %d threads…", workers)
-    extract_texts_parallel(pending, MAX_CHARS_PER_FILE, workers)
+    # Split early: images use Vision API, text files use text extraction + batch
+    image_records = [r for r in pending if r.path.suffix.lower() in IMAGE_EXTENSIONS]
+    text_records  = [r for r in pending if r.path.suffix.lower() not in IMAGE_EXTENSIONS]
 
-    batch_id = submit_batch(client, pending, topics, batch_size, state_path)
+    if text_records:
+        log.info("Extracting text from %d files using %d threads…", len(text_records), workers)
+        extract_texts_parallel(text_records, MAX_CHARS_PER_FILE, workers)
+    if image_records:
+        log.info("Skipping text extraction for %d image files — using Claude Vision instead.", len(image_records))
+
+    # Images cannot go through the Batch API (no vision support there).
+    # Classify them now via real-time Vision API, then exclude from batch submit.
+    if image_records:
+        img_batches = [
+            image_records[i: i + IMAGE_VISION_BATCH_SIZE]
+            for i in range(0, len(image_records), IMAGE_VISION_BATCH_SIZE)
+        ]
+        log.info(
+            "Classifying %d images via Vision API (%d batches) before batch submit…",
+            len(image_records), len(img_batches),
+        )
+        for i, img_batch in enumerate(tqdm(img_batches, desc="Classifying images", unit="batch")):
+            _vision_classify_batch(client, img_batch, topics, API_RETRY_ATTEMPTS, API_RETRY_DELAY)
+            if i < len(img_batches) - 1:
+                time.sleep(random.uniform(INTER_BATCH_DELAY_MIN, INTER_BATCH_DELAY_MAX))
+
+        # Apply moves for images right away (can't defer to collect phase)
+        img_moved = 0
+        img_renamed = 0
+        for r in image_records:
+            if not r.topic:
+                r.topic = "Other"
+            success = move_or_copy_file(r, output_dir, copy=dry_run, dry_run=dry_run)
+            if success:
+                img_moved += 1
+                if r.new_name:
+                    img_renamed += 1
+
+        # Persist image results + stats so collect phase can include them in summary
+        img_result: dict[str, str] = {
+            str(r.path.resolve()): r.topic or "Other" for r in image_records
+        }
+        done.update(img_result)
+        # Store image stats under a reserved key for the collect phase
+        done["__image_stats__"] = f"{img_moved},{img_renamed}"
+        save_progress(progress_path, done)
+        log.info(
+            "Images: %d moved, %d renamed. Results saved to progress file.",
+            img_moved, img_renamed,
+        )
+
+    if not text_records:
+        log.info("No text-based files to batch-submit.")
+        return ""
+
+    batch_id = submit_batch(client, text_records, topics, batch_size, state_path)
     log.info(
         "\nBatch submitted! Wait for it to finish (minutes to ~1 hour), then run:\n"
         "  python sort_files_by_topic.py --collect",
@@ -1121,18 +1330,20 @@ def run_batch_submit_phase(
 def run_batch_collect_phase(output_dir: Path, copy: bool, dry_run: bool, wait: bool) -> SortStats:
     """Batch phase 2: retrieve results and move files.
 
-    Args:
-        output_dir: Directory containing state and progress files.
-        copy:       Copy instead of move.
-        dry_run:    Preview only.
-        wait:       Poll until batch finishes before collecting.
-
     Returns:
-        SortStats with move counts, or empty SortStats if batch not yet done.
+        SortStats with move counts, or empty SortStats if batch not yet done or state missing.
     """
     client     = _get_client()
     state_path = output_dir / BATCH_STATE_FILE
-    state      = load_batch_state(state_path)
+
+    try:
+        state = load_batch_state(state_path)
+    except FileNotFoundError as exc:
+        log.error("%s", exc)
+        return SortStats()
+    except (ValueError, OSError) as exc:
+        log.error("Failed to load batch state: %s", exc)
+        return SortStats()
 
     batch_id:   str            = state["batch_id"]
     topics:     list[str]      = state["topics"]
@@ -1158,6 +1369,13 @@ def run_batch_collect_phase(output_dir: Path, copy: bool, dry_run: bool, wait: b
     progress_path = output_dir / PROGRESS_FILE
     done          = load_progress(progress_path)
 
+    # Recover image stats saved during submit phase
+    img_stats_raw = done.pop("__image_stats__", "0,0")
+    try:
+        img_moved, img_renamed = (int(x) for x in img_stats_raw.split(","))
+    except ValueError:
+        img_moved, img_renamed = 0, 0
+
     stats = apply_topics_and_move(
         path_to_result=path_to_result,
         output_dir=output_dir,
@@ -1166,6 +1384,12 @@ def run_batch_collect_phase(output_dir: Path, copy: bool, dry_run: bool, wait: b
         done=done,
         progress_path=progress_path,
     )
+
+    # Add image counts to summary
+    stats.moved      += img_moved
+    stats.renamed    += img_renamed
+    stats.classified += img_moved
+    stats.total      += img_moved
 
     if not dry_run and state_path.exists():
         state_path.unlink()
@@ -1179,14 +1403,7 @@ def run_batch_collect_phase(output_dir: Path, copy: bool, dry_run: bool, wait: b
 # ---------------------------------------------------------------------------
 
 def _get_client() -> anthropic.Anthropic:
-    """Create and return an Anthropic client, raising clearly if key is missing.
-
-    Returns:
-        Configured Anthropic client.
-
-    Raises:
-        EnvironmentError: If ANTHROPIC_API_KEY is not set.
-    """
+    """Create and return an Anthropic client, raising clearly if key is missing."""
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
         raise EnvironmentError(
@@ -1203,13 +1420,7 @@ def _get_client() -> anthropic.Anthropic:
 # ---------------------------------------------------------------------------
 
 def print_summary(stats: SortStats, dry_run: bool, mode: str) -> None:
-    """Print a human-readable summary of the sorting run.
-
-    Args:
-        stats:   Populated SortStats instance.
-        dry_run: Whether this was a preview run.
-        mode:    Mode label (e.g. 'standard', 'batch-collect').
-    """
+    """Print a human-readable summary of the sorting run."""
     tag = " [DRY-RUN]" if dry_run else ""
     print(f"\n{'='*54}")
     print(f"  File Sorting Summary  [{mode.upper()}]{tag}")
@@ -1236,11 +1447,7 @@ def print_summary(stats: SortStats, dry_run: bool, mode: str) -> None:
 # ---------------------------------------------------------------------------
 
 def parse_args() -> argparse.Namespace:
-    """Parse command-line arguments.
-
-    Returns:
-        Parsed argparse Namespace.
-    """
+    """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
         description=(
             "Sort files into topic folders using Claude AI.\n"
@@ -1254,89 +1461,37 @@ def parse_args() -> argparse.Namespace:
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument(
-        "--input", "-i", type=Path, default=None,
-        help=f"Input directory (default: INPUT_DIR = '{INPUT_DIR}').",
-    )
-    parser.add_argument(
-        "--output", "-o", type=Path, default=None,
-        help=f"Output directory (default: OUTPUT_DIR = '{OUTPUT_DIR}').",
-    )
-    parser.add_argument(
-        "--topics", "-t", default=None,
-        help="Comma-separated topic labels. Defaults to built-in list.",
-    )
-    parser.add_argument(
-        "--standard", action="store_true",
-        help="Use real-time standard API instead of batch.",
-    )
-    parser.add_argument(
-        "--collect", action="store_true",
-        help="Collect batch results and move files (run after submit).",
-    )
-    parser.add_argument(
-        "--wait", action="store_true",
-        help="Submit (if needed) then block until done and collect automatically.",
-    )
-    parser.add_argument(
-        "--batch-size", type=int, default=BATCH_SIZE,
-        help=f"Files per API request (default: {BATCH_SIZE}).",
-    )
-    parser.add_argument(
-        "--workers", type=int, default=MAX_WORKERS,
-        help=f"Parallel extraction threads (default: {MAX_WORKERS}).",
-    )
-    parser.add_argument(
-        "--copy", action="store_true",
-        help="Copy files instead of moving them.",
-    )
-    parser.add_argument(
-        "--dry-run", action="store_true",
-        help="Preview without touching any files.",
-    )
-    parser.add_argument(
-        "--verbose", "-v", action="store_true",
-        help="Enable debug logging.",
-    )
+    parser.add_argument("--input",  "-i", type=Path, default=None,
+                        help=f"Input directory (default: INPUT_DIR = '{INPUT_DIR}').")
+    parser.add_argument("--output", "-o", type=Path, default=None,
+                        help=f"Output directory (default: OUTPUT_DIR = '{OUTPUT_DIR}').")
+    parser.add_argument("--topics", "-t", default=None,
+                        help="Comma-separated topic labels. Defaults to built-in list.")
+    parser.add_argument("--standard",   action="store_true",
+                        help="Use real-time standard API instead of batch.")
+    parser.add_argument("--collect",    action="store_true",
+                        help="Collect batch results and move files (run after submit).")
+    parser.add_argument("--wait",       action="store_true",
+                        help="Submit (if needed) then block until done and collect automatically.")
+    parser.add_argument("--batch-size", type=int, default=BATCH_SIZE,
+                        help=f"Files per API request (default: {BATCH_SIZE}).")
+    parser.add_argument("--workers",    type=int, default=MAX_WORKERS,
+                        help=f"Parallel extraction threads (default: {MAX_WORKERS}).")
+    parser.add_argument("--copy",       action="store_true",
+                        help="Copy files instead of moving them.")
+    parser.add_argument("--dry-run",    action="store_true",
+                        help="Preview without touching any files.")
+    parser.add_argument("--verbose", "-v", action="store_true",
+                        help="Enable debug logging.")
     return parser.parse_args()
 
 
-def main() -> None:
-    """Entry point: parse args, validate, dispatch to correct pipeline."""
-    args = parse_args()
+def _dispatch(args: argparse.Namespace, input_dir: Path, output_dir: Path, topics: list[str]) -> None:
+    """Dispatch to the correct pipeline and print summary.
 
-    if args.verbose:
-        logging.getLogger().setLevel(logging.DEBUG)
-
-    # Resolve directories: CLI overrides > module-level constants
-    input_dir  = args.input  if args.input  else INPUT_DIR
-    output_dir = args.output if args.output else OUTPUT_DIR
-
-    input_dir  = input_dir.resolve()
-    output_dir = output_dir.resolve()
-
-    if not input_dir.is_dir():
-        log.error("Input directory does not exist: %s", input_dir)
-        raise SystemExit(1)
-
-    # Create output dir early so state files have a home
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    topics: list[str] = (
-        [t.strip() for t in args.topics.split(",") if t.strip()]
-        if args.topics else DEFAULT_TOPICS
-    )
-
-    if args.dry_run:
-        log.info("DRY-RUN mode — no files will be moved or copied.")
-
-    log.info("Input  : %s", input_dir)
-    log.info("Output : %s", output_dir)
-    log.info("Model  : %s", MODEL)
-    log.info("Topics (%d): %s", len(topics), ", ".join(topics))
-
-    # ---- Dispatch ----
-
+    Extracted so both main_() and main() can share the same dispatch logic
+    without duplicating code.
+    """
     if args.collect:
         stats = run_batch_collect_phase(
             output_dir=output_dir, copy=args.copy, dry_run=args.dry_run, wait=False,
@@ -1364,7 +1519,7 @@ def main() -> None:
         print_summary(stats, dry_run=args.dry_run, mode="standard")
 
     else:
-        # Default: submit + wait + collect — all in one run, no flags needed
+        # Default: submit + wait + collect in one run
         state_path = output_dir / BATCH_STATE_FILE
         if not state_path.exists():
             run_batch_submit_phase(
@@ -1375,6 +1530,79 @@ def main() -> None:
             output_dir=output_dir, copy=args.copy, dry_run=args.dry_run, wait=True,
         )
         print_summary(stats, dry_run=args.dry_run, mode="batch")
+
+
+def main() -> None:
+    """Entry point: parse args, validate, dispatch to correct pipeline."""
+    args = parse_args()
+
+    if args.verbose:
+        logging.getLogger().setLevel(logging.DEBUG)
+
+    input_dir  = (args.input  if args.input  else INPUT_DIR).resolve()
+    output_dir = (args.output if args.output else OUTPUT_DIR).resolve()
+
+    if not input_dir.is_dir():
+        log.error("Input directory does not exist: %s", input_dir)
+        raise SystemExit(1)
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    topics: list[str] = (
+        [t.strip() for t in args.topics.split(",") if t.strip()]
+        if args.topics else DEFAULT_TOPICS
+    )
+
+    if args.dry_run:
+        log.info("DRY-RUN mode — no files will be moved or copied.")
+
+    log.info("Input  : %s", input_dir)
+    log.info("Output : %s", output_dir)
+    log.info("Model  : %s", MODEL)
+    log.info("Topics (%d): %s", len(topics), ", ".join(topics))
+
+    _dispatch(args, input_dir, output_dir, topics)
+
+
+def main_loop_file_types() -> None:
+    """Loop over file types and run the full pipeline for each."""
+    args = parse_args()
+
+    if args.verbose:
+        logging.getLogger().setLevel(logging.DEBUG)
+
+    topics: list[str] = (
+        [t.strip() for t in args.topics.split(",") if t.strip()]
+        if args.topics else DEFAULT_TOPICS
+    )
+
+    for extension in ["txt", "html", "xls", "pdf", "docx", "img"]:
+        print(f"\nStart {extension} : {time.strftime('%H:%M:%S')}")
+        start_time_e = int(time.time())
+
+        input_dir  = Path(f"C:\\Users\\rcxsm\\Documents\\{extension}\\unsorted").resolve()
+        output_dir = Path(f"C:\\Users\\rcxsm\\Documents\\{extension}\\sorted").resolve()
+
+        if not input_dir.is_dir():
+            log.error("Input directory does not exist: %s — skipping %s.", input_dir, extension)
+            continue
+
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        if args.dry_run:
+            log.info("DRY-RUN mode — no files will be moved or copied.")
+
+        log.info("Input  : %s", input_dir)
+        log.info("Output : %s", output_dir)
+        log.info("Model  : %s", MODEL)
+        log.info("Topics (%d): %s", len(topics), ", ".join(topics))
+
+        _dispatch(args, input_dir, output_dir, topics)
+
+        elapsed_e            = int(time.time()) - start_time_e
+        minutes_e, seconds_e = divmod(elapsed_e, 60)
+        print(f"End    : {time.strftime('%H:%M:%S')}")
+        print(f"Total time {extension}: {elapsed_e}s  ({minutes_e:02d}:{seconds_e:02d})")
 
 
 # ---------------------------------------------------------------------------
