@@ -76,8 +76,8 @@ for _noisy in (
 
 # INPUT_DIR:  Path = Path(r"C:\Users\rcxsm\Documents\docx")
 # OUTPUT_DIR: Path = Path(r"C:\Users\rcxsm\Documents\docx\sorted")
-INPUT_DIR:  Path = Path(r"C:\Users\rcxsm\Pictures\unsorted\to_sort")
-OUTPUT_DIR: Path = Path(r"C:\Users\rcxsm\Pictures\unsorted\sorted")
+INPUT_DIR:  Path = Path(r"C:\Users\rcxsm\Pictures\Screenshots\unsorted")
+OUTPUT_DIR: Path = Path(r"C:\Users\rcxsm\Pictures\Screenshots\sorted")
 
 # ---------------------------------------------------------------------------
 # Topic list
@@ -108,6 +108,7 @@ DEFAULT_TOPICS: list[str] = [
     "Veganism",
     "Covid",
     "Hospitality & Catering",
+    "Color palettes & Fonts",
     "Other",
 ]
 
@@ -130,7 +131,7 @@ SUPPORTED_EXTENSIONS: set[str] = {
 MODEL:               str   = "claude-haiku-4-5-20251001"
 PAGES_TO_EXTRACT:    int   = 2        # pages to read per PDF/DOCX
 MAX_CHARS_PER_FILE:  int   = 3_000    # max chars sent to Claude per file
-BATCH_SIZE:          int   = 10       # files per API request
+BATCH_SIZE:          int   = 5        # files per API request (keep low: each file needs ~100 tokens of output)
 MAX_WORKERS:         int   = 16       # parallel extraction threads
 API_RETRY_ATTEMPTS:  int   = 3
 API_RETRY_DELAY:     float = 5.0      # seconds between retries
@@ -209,7 +210,8 @@ def _is_bad_filename(stem: str) -> bool:
     """Return True if the filename stem is meaningless and should be renamed.
 
     Catches: pure digit strings, UUIDs, random alphanumeric blobs, very short
-    consonant-only strings, and names with fewer than 40% letter characters.
+    consonant-only strings, names with fewer than 40% letter characters, and
+    common auto-generated names from Windows, cameras, and phones.
 
     Args:
         stem: Filename without extension.
@@ -219,16 +221,34 @@ def _is_bad_filename(stem: str) -> bool:
     """
     if not stem:
         return True
+    # Pure digits  (e.g. "1234567890")
     if stem.isdigit():
         return True
+    # UUID pattern  (with or without hyphens)
     if re.fullmatch(
         r"[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}",
         stem, re.I,
     ):
         return True
+    # Windows screenshot auto-names: "Screenshot (123)", "Screenshot_20240101_120000"
+    if re.fullmatch(r"screenshot[\s_(-]*\d[\d\s()_-]*", stem, re.I):
+        return True
+    if re.fullmatch(r"schermopname[\s_(-]*\d[\d\s()_-]*", stem, re.I):
+        return True
+    # Camera/phone auto-names: IMG_1234, DSC_0001, DCIM_20240101, VID_20240101_120000, etc.
+    if re.fullmatch(
+        r"(img|dsc|dscn|dcim|vid|photo|image|capture|snap|pxl|cam|mov|clip)[-_]?\d[\d_-]*",
+        stem, re.I,
+    ):
+        return True
+    # WhatsApp / Telegram: IMG-20240101-WA0001, Photo_20240101_120000
+    if re.fullmatch(r"(img|vid|photo|audio|video)[-_]\d{8}[-_].*", stem, re.I):
+        return True
+    # Mostly non-alpha (less than 40% letters)
     letters = sum(c.isalpha() for c in stem)
     if len(stem) >= 4 and letters / len(stem) < 0.4:
         return True
+    # Short and no vowels  (e.g. "xkbf", "z7q3")
     if len(stem) <= 6 and not any(c in "aeiouAEIOU" for c in stem):
         return True
     return False
@@ -241,11 +261,11 @@ def _sanitize_suggested_name(raw: str) -> str:
         raw: Raw suggested name from Claude (no extension).
 
     Returns:
-        Alphanumeric + underscore string, max 30 characters.
+        Alphanumeric + underscore string, max 50 characters.
     """
     cleaned = re.sub(r"[^\w]", "_", raw.strip())
     cleaned = re.sub(r"_+", "_", cleaned).strip("_")
-    return cleaned[:30]
+    return cleaned[:50]
 
 
 # ---------------------------------------------------------------------------
@@ -317,9 +337,9 @@ def _extract_xlsx(file_path: Path, max_chars: int) -> str:
                 chunks.append(row_text)
     return "\n".join(chunks)[:max_chars]
 
+
 def _extract_image_with_pytesseract(file_path: Path, max_chars: int) -> str:
     """ Not used """
-
     try:
         import pytesseract          # type: ignore
         from PIL import Image       # type: ignore
@@ -362,11 +382,10 @@ _MEDIA_TYPE_MAP: dict[str, str] = {
     ".bmp":  "image/jpeg",
 }
 
-
 # Anthropic API rejects images larger than ~5 MB (base64-encoded).
 # We resize to fit within this budget using Pillow before encoding.
 _MAX_IMAGE_BYTES: int   = 4_500_000   # 4.5 MB base64 budget (conservative)
-_MAX_IMAGE_DIM:   int   = 1568        # max long-edge in pixels (good quality, small size)
+_MAX_IMAGE_DIM:   int   = 1024        # max long-edge in pixels (good quality, small size)
 
 
 def _image_to_base64(file_path: Path) -> tuple[str, str]:
@@ -428,7 +447,7 @@ def _vision_classify_batch(
 
     Sends all images in a single multi-image message.  Each image gets:
       - A topic from the allowed list
-      - A short_description (≤50 chars, plain language, no quotes) that is used
+      - A short_description (<=50 chars, plain language, no quotes) that is used
         as a filename prefix when the original filename is meaningless.
 
     Results are written back into each record's .topic and .new_name fields.
@@ -446,7 +465,8 @@ def _vision_classify_batch(
     topic_list = "\n".join(f"- {t}" for t in topics)
     content: list[dict] = []
 
-    # Build multi-image message
+    # Build multi-image message; skip records that fail to encode
+    encodable_records: list[FileRecord] = []
     for i, record in enumerate(records):
         try:
             b64, media_type = _image_to_base64(record.path)
@@ -459,7 +479,7 @@ def _vision_classify_batch(
         content.append({
             "type": "text",
             "text": (
-                f"Image {i} — filename: {record.path.name}"
+                f"Image {len(encodable_records)} — filename: {record.path.name}"
                 + ("  [NEEDS_RENAME]" if _is_bad_filename(record.path.stem) else "")
             ),
         })
@@ -467,6 +487,11 @@ def _vision_classify_batch(
             "type": "image",
             "source": {"type": "base64", "media_type": media_type, "data": b64},
         })
+        encodable_records.append(record)
+
+    if not encodable_records:
+        log.warning("No encodable images in this batch; skipping vision call.")
+        return
 
     content.append({
         "type": "text",
@@ -490,7 +515,7 @@ def _vision_classify_batch(
         try:
             response = client.messages.create(
                 model=MODEL,
-                max_tokens=512,
+                max_tokens=1024,
                 messages=[{"role": "user", "content": content}],
             )
             raw = ""
@@ -511,6 +536,7 @@ def _vision_classify_batch(
                     time.sleep(retry_delay)
                 continue
 
+            parsed_count = 0
             for item in results:
                 if not isinstance(item, dict):
                     continue
@@ -518,7 +544,7 @@ def _vision_classify_batch(
                     idx = int(item["index"])
                 except (KeyError, ValueError, TypeError):
                     continue
-                if idx < 0 or idx >= len(records):
+                if idx < 0 or idx >= len(encodable_records):
                     continue
 
                 topic = str(item.get("topic", "")).strip()
@@ -526,21 +552,26 @@ def _vision_classify_batch(
                     topic = "Other"
                 elif topic not in topics:
                     topic = _best_match(topic, topics)
-                records[idx].topic = topic
+                encodable_records[idx].topic = topic
 
-                desc = item.get("short_description", "")
+                desc = str(item.get("short_description", "")).strip()
                 if desc:
-                    clean_desc = _sanitize_suggested_name(str(desc))
-                    orig_stem  = records[idx].path.stem
-                    if _is_bad_filename(orig_stem):
-                        # Bad name: replace entirely with description
-                        records[idx].new_name = clean_desc[:50]
-                    else:
-                        # Good name: prepend description as prefix
-                        records[idx].new_name = f"{clean_desc[:30]}_{orig_stem}"[:80]
+                    clean_desc = _sanitize_suggested_name(desc)
+                    orig_stem  = encodable_records[idx].path.stem
+                    # if _is_bad_filename(orig_stem):
+                    # encodable_records[idx].new_name = clean_desc[:50]
+                    # else:
+                    encodable_records[idx].new_name = f"{clean_desc[:50]}_{orig_stem}"[:80]
+                parsed_count += 1
+
+            if parsed_count == 0:
+                log.warning("Vision attempt %d/%d: parsed 0 items from response.", attempt, retries)
+                if attempt < retries:
+                    time.sleep(retry_delay)
+                continue
 
             # Fill in any records that didn't get a result
-            for record in records:
+            for record in encodable_records:
                 if not record.topic:
                     record.topic = "Other"
             return
@@ -557,7 +588,7 @@ def _vision_classify_batch(
         if attempt < retries:
             time.sleep(retry_delay)
 
-    for record in records:
+    for record in encodable_records:
         if not record.topic:
             record.error = "classification_failed"
             record.topic = "Other"
@@ -623,7 +654,7 @@ def build_classification_prompt(batch: list[FileRecord], topics: list[str]) -> s
 
     rename_instruction = (
         '\nFor files marked [NEEDS_RENAME], also include a "suggested_name" key: '
-        "a descriptive filename stem of max 30 characters, no extension, "
+        "a descriptive filename stem of max 50 characters, no extension, "
         'use_underscores_for_spaces, no special characters. Omit "suggested_name" for other files.\n'
     ) if needs_rename else ""
 
@@ -646,7 +677,10 @@ def build_classification_prompt(batch: list[FileRecord], topics: list[str]) -> s
 def _extract_json_array(raw: str) -> list[dict]:
     """Robustly extract a JSON array from Claude's response.
 
-    Handles: raw JSON, ```json fences, leading/trailing prose, partial wrapping.
+    Tries multiple strategies in order, returning on first success:
+    1. Raw text directly
+    2. Content inside ```...``` fences
+    3. Bracket-scan: first '[' to last ']'
 
     Args:
         raw: Raw text from Claude.
@@ -657,38 +691,43 @@ def _extract_json_array(raw: str) -> list[dict]:
     Raises:
         ValueError: If no valid JSON array can be extracted.
     """
+    def _try_parse(s: str):
+        s = s.strip()
+        if not s.startswith("["):
+            return None
+        try:
+            result = json.loads(s)
+            if isinstance(result, list):
+                return result
+        except json.JSONDecodeError:
+            pass
+        return None
+
     text = raw.strip()
 
-    # Strip ```json ... ``` fences
+    # Strategy 1: try the raw text directly
+    result = _try_parse(text)
+    if result is not None:
+        return result
+
+    # Strategy 2: extract content from ```...``` fences and try each block
     if "```" in text:
         parts = text.split("```")
         for part in parts:
             candidate = part.strip()
             if candidate.startswith("json"):
                 candidate = candidate[4:].strip()
-            if candidate.startswith("["):
-                text = candidate
-                break
-
-    # Try the whole string first
-    if text.startswith("["):
-        try:
-            result = json.loads(text)
-            if isinstance(result, list):
+            result = _try_parse(candidate)
+            if result is not None:
                 return result
-        except json.JSONDecodeError:
-            pass
 
-    # Find the first '[' ... last ']' bracket pair
+    # Strategy 3: find the first '[' ... last ']' bracket pair in the full text
     start = text.find("[")
     end   = text.rfind("]")
     if start != -1 and end != -1 and end > start:
-        try:
-            result = json.loads(text[start : end + 1])
-            if isinstance(result, list):
-                return result
-        except json.JSONDecodeError:
-            pass
+        result = _try_parse(text[start : end + 1])
+        if result is not None:
+            return result
 
     raise ValueError(f"No valid JSON array found in response (length {len(raw)}): {raw[:200]!r}")
 
@@ -785,7 +824,7 @@ def classify_batch_standard(
         try:
             response = client.messages.create(
                 model=MODEL,
-                max_tokens=512,
+                max_tokens=1024,
                 messages=[{"role": "user", "content": prompt}],
             )
             raw = ""
@@ -831,7 +870,7 @@ def build_batch_requests(
             "custom_id": f"sub{sub_idx:06d}",
             "params": {
                 "model": MODEL,
-                "max_tokens": 512,
+                "max_tokens": 1024,
                 "messages": [{"role": "user", "content": prompt}],
             },
         })
@@ -892,7 +931,7 @@ def collect_batch_results(
     id_to_path: dict[str, str],
     batch_size: int,
 ) -> dict[str, tuple[str, str]]:
-    """Retrieve batch results; return path → (topic, new_name) mapping."""
+    """Retrieve batch results; return path -> (topic, new_name) mapping."""
     # Reconstruct sub-batch structure
     sub_batches: dict[int, list[tuple[int, str, str]]] = {}
     for custom_id, abs_path in id_to_path.items():
@@ -950,7 +989,6 @@ def collect_batch_results(
             log.warning("Parse failed for sub-batch %s; defaulting all to 'Other'.", sub_id)
 
         for record in stub_records:
-            # topic is "" if parse failed for that record — fall back to "Other"
             topic = record.topic if record.topic else "Other"
             path_to_result[str(record.path.resolve())] = (topic, record.new_name)
             result_count += 1
@@ -993,7 +1031,7 @@ def move_or_copy_file(
 
     if dry_run:
         action      = "COPY" if copy else "MOVE"
-        rename_note = f" → {filename}" if record.new_name else ""
+        rename_note = f" -> {filename}" if record.new_name else ""
         log.debug("%s [DRY-RUN] %s%s -> %s/", action, record.path.name, rename_note, folder_name)
         return True
 
@@ -1017,7 +1055,7 @@ def apply_topics_and_move(
     done: dict[str, str],
     progress_path: Path,
 ) -> SortStats:
-    """Move/copy all files based on path→(topic, new_name); update progress."""
+    """Move/copy all files based on path->(topic, new_name); update progress."""
     stats       = SortStats()
     stats.total = len(path_to_result)
 
@@ -1031,11 +1069,11 @@ def apply_topics_and_move(
             stats.classified += 1
             if new_name:
                 stats.renamed += 1
-            stats.topic_counts[topic]                    = stats.topic_counts.get(topic, 0) + 1
-            ext                                          = record.path.suffix.lower()
-            stats.type_counts[ext]                       = stats.type_counts.get(ext, 0) + 1
+            stats.topic_counts[topic]  = stats.topic_counts.get(topic, 0) + 1
+            ext                        = record.path.suffix.lower()
+            stats.type_counts[ext]     = stats.type_counts.get(ext, 0) + 1
             if not dry_run:
-                done[abs_path_str] = topic
+                done[abs_path_str] = _progress_encode(topic, new_name)
         else:
             stats.failed += 1
 
@@ -1053,7 +1091,11 @@ def apply_topics_and_move(
 # ---------------------------------------------------------------------------
 
 def load_progress(progress_path: Path) -> dict[str, str]:
-    """Load previously completed path→topic mappings from disk."""
+    """Load previously completed path -> 'topic|new_name' mappings from disk.
+
+    Values are stored as 'topic' (legacy) or 'topic|new_name' (current).
+    Reserved keys starting with '__' are passed through unchanged.
+    """
     if progress_path.exists():
         try:
             with open(progress_path, "r", encoding="utf-8") as fh:
@@ -1066,8 +1108,24 @@ def load_progress(progress_path: Path) -> dict[str, str]:
     return {}
 
 
+def _progress_encode(topic: str, new_name: str) -> str:
+    """Encode topic + new_name into a single progress-file value."""
+    return f"{topic}|{new_name}" if new_name else topic
+
+
+def _progress_decode(value: str) -> tuple[str, str]:
+    """Decode a progress-file value into (topic, new_name).
+
+    Handles legacy entries that contain only a topic (no pipe).
+    """
+    if "|" in value:
+        topic, new_name = value.split("|", 1)
+        return topic, new_name
+    return value, ""
+
+
 def save_progress(progress_path: Path, done: dict[str, str]) -> None:
-    """Persist completed path→topic mappings to disk."""
+    """Persist completed path -> 'topic|new_name' mappings to disk."""
     try:
         with open(progress_path, "w", encoding="utf-8") as fh:
             json.dump(done, fh, indent=2)
@@ -1092,7 +1150,7 @@ def load_batch_state(state_path: Path) -> dict:
     if not state_path.exists():
         raise FileNotFoundError(
             f"Batch state file not found: {state_path}\n"
-            "  → Run submit phase first (without --collect)."
+            "  -> Run submit phase first (without --collect)."
         )
     try:
         with open(state_path, "r", encoding="utf-8") as fh:
@@ -1102,7 +1160,6 @@ def load_batch_state(state_path: Path) -> dict:
     except OSError as exc:
         raise OSError(f"Could not read batch state file: {exc}") from exc
 
-    # Validate required keys so callers don't get surprise KeyErrors later
     required = {"batch_id", "topics", "batch_size", "id_to_path"}
     missing  = required - data.keys()
     if missing:
@@ -1144,7 +1201,7 @@ def run_standard_pipeline(
     batch_size: int,
     workers: int,
 ) -> SortStats:
-    """Standard pipeline: discover → extract → classify (real-time) → move."""
+    """Standard pipeline: discover -> extract -> classify (real-time) -> move."""
     stats  = SortStats()
     client = _get_client()
 
@@ -1179,18 +1236,35 @@ def run_standard_pipeline(
     if image_records:
         log.info("Skipping text extraction for %d image files — using Claude Vision instead.", len(image_records))
 
-    # Classify text-based files
+    # Classify text-based files — move and save immediately after each batch
     if text_records:
         batches = [text_records[i: i + batch_size] for i in range(0, len(text_records), batch_size)]
-        log.info("Classifying %d text batches via standard API…", len(batches))
+        log.info("Classifying and moving %d text batches via standard API…", len(batches))
         for i, batch in enumerate(tqdm(batches, desc="Classifying text", unit="batch")):
             classify_batch_standard(client, batch, topics, API_RETRY_ATTEMPTS, API_RETRY_DELAY)
-            stats.classified += sum(1 for r in batch if r.topic and r.error != "classification_failed")
-            stats.failed     += sum(1 for r in batch if r.error == "classification_failed")
+            for record in batch:
+                if not record.topic or record.error == "classification_failed":
+                    stats.failed += 1
+                    continue
+                success = move_or_copy_file(record, output_dir, copy=copy, dry_run=dry_run)
+                if success:
+                    stats.moved += 1
+                    stats.classified += 1
+                    if record.new_name:
+                        stats.renamed += 1
+                    stats.topic_counts[record.topic] = stats.topic_counts.get(record.topic, 0) + 1
+                    ext = record.path.suffix.lower()
+                    stats.type_counts[ext] = stats.type_counts.get(ext, 0) + 1
+                    if not dry_run:
+                        done[str(record.path.resolve())] = _progress_encode(record.topic, record.new_name)
+                else:
+                    stats.failed += 1
+            if not dry_run:
+                save_progress(progress_path, done)
             if i < len(batches) - 1:
                 time.sleep(random.uniform(INTER_BATCH_DELAY_MIN, INTER_BATCH_DELAY_MAX))
 
-    # Classify images via Claude Vision (real-time, batches of IMAGE_VISION_BATCH_SIZE)
+    # Classify images via Claude Vision — move and save immediately after each batch
     if image_records:
         img_batches = [
             image_records[i: i + IMAGE_VISION_BATCH_SIZE]
@@ -1202,30 +1276,26 @@ def run_standard_pipeline(
         )
         for i, img_batch in enumerate(tqdm(img_batches, desc="Classifying images", unit="batch")):
             _vision_classify_batch(client, img_batch, topics, API_RETRY_ATTEMPTS, API_RETRY_DELAY)
-            stats.classified += sum(1 for r in img_batch if r.topic and r.error != "classification_failed")
-            stats.failed     += sum(1 for r in img_batch if r.error == "classification_failed")
+            for r in img_batch:
+                if not r.topic:
+                    r.topic = "Other"
+                success = move_or_copy_file(r, output_dir, copy=copy, dry_run=dry_run)
+                if success:
+                    stats.moved += 1
+                    stats.classified += 1
+                    if r.new_name:
+                        stats.renamed += 1
+                    stats.topic_counts[r.topic] = stats.topic_counts.get(r.topic, 0) + 1
+                    ext = r.path.suffix.lower()
+                    stats.type_counts[ext] = stats.type_counts.get(ext, 0) + 1
+                    if not dry_run:
+                        done[str(r.path.resolve())] = _progress_encode(r.topic, r.new_name)
+                else:
+                    stats.failed += 1
+            if not dry_run:
+                save_progress(progress_path, done)
             if i < len(img_batches) - 1:
                 time.sleep(random.uniform(INTER_BATCH_DELAY_MIN, INTER_BATCH_DELAY_MAX))
-
-    log.info("Moving files%s…", " [DRY-RUN]" if dry_run else "")
-    for record in tqdm(pending, desc="Moving files", unit="file"):
-        if not record.topic:
-            stats.failed += 1
-            continue
-        success = move_or_copy_file(record, output_dir, copy=copy, dry_run=dry_run)
-        if success:
-            stats.moved += 1
-            if record.new_name:
-                stats.renamed += 1
-            stats.topic_counts[record.topic] = stats.topic_counts.get(record.topic, 0) + 1
-            ext = record.path.suffix.lower()
-            stats.type_counts[ext] = stats.type_counts.get(ext, 0) + 1
-            if not dry_run:
-                done[str(record.path.resolve())] = record.topic
-        else:
-            stats.failed += 1
-        if not dry_run and stats.moved % 50 == 0:
-            save_progress(progress_path, done)
 
     if not dry_run:
         save_progress(progress_path, done)
@@ -1239,8 +1309,13 @@ def run_batch_submit_phase(
     batch_size: int,
     workers: int,
     dry_run: bool = False,
-) -> str:
-    """Batch phase 1: extract text, classify images via Vision, submit text files to Batch API."""
+) -> "SortStats | None":
+    """Batch phase 1: extract text, classify images via Vision, submit text files to Batch API.
+
+    Returns:
+        SortStats if all work is done (image-only input, no batch needed).
+        None if a text batch was submitted and collect phase must follow.
+    """
     client = _get_client()
     output_dir.mkdir(parents=True, exist_ok=True)
     progress_path = output_dir / PROGRESS_FILE
@@ -1262,7 +1337,10 @@ def run_batch_submit_phase(
     log.info("%d pending  |  %d skipped (already done)", len(pending), skipped)
     if not pending:
         log.info("Nothing to submit.")
-        return ""
+        stats = SortStats()
+        stats.skipped = skipped
+        stats.total   = skipped
+        return stats
 
     # Split early: images use Vision API, text files use text extraction + batch
     image_records = [r for r in pending if r.path.suffix.lower() in IMAGE_EXTENSIONS]
@@ -1285,31 +1363,27 @@ def run_batch_submit_phase(
             "Classifying %d images via Vision API (%d batches) before batch submit…",
             len(image_records), len(img_batches),
         )
+        img_moved   = 0
+        img_renamed = 0
         for i, img_batch in enumerate(tqdm(img_batches, desc="Classifying images", unit="batch")):
             _vision_classify_batch(client, img_batch, topics, API_RETRY_ATTEMPTS, API_RETRY_DELAY)
+            # Move and save immediately after each batch — progress safe if script dies
+            for r in img_batch:
+                if not r.topic:
+                    r.topic = "Other"
+                success = move_or_copy_file(r, output_dir, copy=False, dry_run=dry_run)
+                if success:
+                    img_moved += 1
+                    if r.new_name:
+                        img_renamed += 1
+                    if not dry_run:
+                        done[str(r.path.resolve())] = _progress_encode(r.topic, r.new_name)
+            if not dry_run:
+                done["__image_stats__"] = f"{img_moved},{img_renamed}"
+                save_progress(progress_path, done)
             if i < len(img_batches) - 1:
                 time.sleep(random.uniform(INTER_BATCH_DELAY_MIN, INTER_BATCH_DELAY_MAX))
 
-        # Apply moves for images right away (can't defer to collect phase)
-        img_moved = 0
-        img_renamed = 0
-        for r in image_records:
-            if not r.topic:
-                r.topic = "Other"
-            success = move_or_copy_file(r, output_dir, copy=dry_run, dry_run=dry_run)
-            if success:
-                img_moved += 1
-                if r.new_name:
-                    img_renamed += 1
-
-        # Persist image results + stats so collect phase can include them in summary
-        img_result: dict[str, str] = {
-            str(r.path.resolve()): r.topic or "Other" for r in image_records
-        }
-        done.update(img_result)
-        # Store image stats under a reserved key for the collect phase
-        done["__image_stats__"] = f"{img_moved},{img_renamed}"
-        save_progress(progress_path, done)
         log.info(
             "Images: %d moved, %d renamed. Results saved to progress file.",
             img_moved, img_renamed,
@@ -1317,14 +1391,32 @@ def run_batch_submit_phase(
 
     if not text_records:
         log.info("No text-based files to batch-submit.")
-        return ""
+        # All work done via Vision API — return stats so caller skips collect phase.
+        img_stats_raw = done.get("__image_stats__", "0,0")
+        try:
+            img_moved, img_renamed = (int(x) for x in img_stats_raw.split(","))
+        except ValueError:
+            img_moved, img_renamed = 0, 0
+        stats         = SortStats()
+        stats.total   = len(all_files)
+        stats.skipped = skipped
+        stats.moved   = img_moved
+        stats.renamed = img_renamed
+        stats.classified = img_moved
+        # Populate topic/type counts from image_records
+        for r in image_records:
+            t = r.topic or "Other"
+            stats.topic_counts[t] = stats.topic_counts.get(t, 0) + 1
+            ext = r.path.suffix.lower()
+            stats.type_counts[ext] = stats.type_counts.get(ext, 0) + 1
+        return stats
 
-    batch_id = submit_batch(client, text_records, topics, batch_size, state_path)
+    submit_batch(client, text_records, topics, batch_size, state_path)
     log.info(
         "\nBatch submitted! Wait for it to finish (minutes to ~1 hour), then run:\n"
         "  python sort_files_by_topic.py --collect",
     )
-    return batch_id
+    return None  # collect phase required
 
 
 def run_batch_collect_phase(output_dir: Path, copy: bool, dry_run: bool, wait: bool) -> SortStats:
@@ -1489,8 +1581,9 @@ def parse_args() -> argparse.Namespace:
 def _dispatch(args: argparse.Namespace, input_dir: Path, output_dir: Path, topics: list[str]) -> None:
     """Dispatch to the correct pipeline and print summary.
 
-    Extracted so both main_() and main() can share the same dispatch logic
-    without duplicating code.
+    run_batch_submit_phase returns:
+      SortStats  — all done (image-only input); skip collect phase.
+      None       — text batch submitted; collect phase required.
     """
     if args.collect:
         stats = run_batch_collect_phase(
@@ -1501,10 +1594,14 @@ def _dispatch(args: argparse.Namespace, input_dir: Path, output_dir: Path, topic
     elif args.wait:
         state_path = output_dir / BATCH_STATE_FILE
         if not state_path.exists():
-            run_batch_submit_phase(
+            submit_result = run_batch_submit_phase(
                 input_dir=input_dir, output_dir=output_dir, topics=topics,
                 batch_size=args.batch_size, workers=args.workers,
             )
+            if isinstance(submit_result, SortStats):
+                # Image-only run — no batch to collect
+                print_summary(submit_result, dry_run=args.dry_run, mode="vision")
+                return
         stats = run_batch_collect_phase(
             output_dir=output_dir, copy=args.copy, dry_run=args.dry_run, wait=True,
         )
@@ -1522,10 +1619,14 @@ def _dispatch(args: argparse.Namespace, input_dir: Path, output_dir: Path, topic
         # Default: submit + wait + collect in one run
         state_path = output_dir / BATCH_STATE_FILE
         if not state_path.exists():
-            run_batch_submit_phase(
+            submit_result = run_batch_submit_phase(
                 input_dir=input_dir, output_dir=output_dir, topics=topics,
                 batch_size=args.batch_size, workers=args.workers,
             )
+            if isinstance(submit_result, SortStats):
+                # Image-only run — all done, no batch state to collect
+                print_summary(submit_result, dry_run=args.dry_run, mode="vision")
+                return
         stats = run_batch_collect_phase(
             output_dir=output_dir, copy=args.copy, dry_run=args.dry_run, wait=True,
         )
