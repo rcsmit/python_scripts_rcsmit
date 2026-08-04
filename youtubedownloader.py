@@ -817,10 +817,6 @@ def main():
     ask = False  # ask if you want to download each file
     wait = True  # wait a random number of seconds in between the downloads
     get_clipboard = True
-    #get_url_list = True #False #True
-
-    # get_clipboard = False
-    #
     get_url_list = False# True
     
 

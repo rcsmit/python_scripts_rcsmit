@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<title>Kassabonnen</title>
+
+<!-- version history
+# version : 20260526-113800 - Initial version: sql.js drag-and-drop receipt viewer
+# version : 20260526-114500 - Light theme
+-->
+<script>const current_version = "20260526-114500";</script>
+
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;800&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --bg:        #f5f4f0;
+    --surface:   #ffffff;
+    --surface2:  #f0ede8;
+    --border:    #ddd9d0;
+    --accent:    #1a6b3c;
+    --accent2:   #0e6655;
+    --text:      #1a1a1a;
+    --muted:     #888;
+    --danger:    #c0392b;
+    --radius:    6px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── header ── */
+  header {
+    padding: 28px 36px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 10;
+    box-shadow: 0 1px 0 var(--border);
+  }
+  header h1 {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 26px;
+    letter-spacing: -0.5px;
+    color: var(--accent);
+  }
+  header .version {
+    font-size: 11px;
+    color: var(--muted);
+  }
+  #db-name {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--accent2);
+    opacity: 0;
+    transition: opacity .3s;
+  }
+  #db-name.visible { opacity: 1; }
+
+  /* ── drop zone ── */
+  #drop-zone {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    cursor: pointer;
+    transition: background .2s;
+    padding: 60px;
+  }
+  #drop-zone.dragover { background: #e8f5ee; }
+  #drop-zone .icon {
+    font-size: 56px;
+    line-height: 1;
+    filter: grayscale(1);
+    transition: filter .2s;
+  }
+  #drop-zone:hover .icon,
+  #drop-zone.dragover .icon { filter: none; }
+  #drop-zone h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  #drop-zone p { color: var(--muted); line-height: 1.7; text-align: center; }
+  #drop-zone .hint {
+    display: inline-block;
+    margin-top: 8px;
+    padding: 6px 14px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 11px;
+    color: var(--accent);
+    cursor: pointer;
+    transition: background .2s;
+  }
+  #drop-zone .hint:hover { background: var(--border); }
+  #file-input { display: none; }
+
+  /* ── main app ── */
+  #app { display: none; flex-direction: column; flex: 1; }
+
+  /* ── stats bar ── */
+  #stats {
+    display: flex;
+    gap: 1px;
+    background: var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+  .stat {
+    flex: 1;
+    padding: 14px 20px;
+    background: var(--surface);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .stat .label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  .stat .value { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 700; color: var(--accent); }
+
+  /* ── toolbar ── */
+  #toolbar {
+    display: flex;
+    gap: 10px;
+    padding: 14px 20px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  input[type=text], input[type=date], select {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    padding: 7px 10px;
+    border-radius: var(--radius);
+    outline: none;
+    transition: border-color .2s;
+  }
+  input[type=text]:focus, input[type=date]:focus, select:focus {
+    border-color: var(--accent);
+  }
+  #search { width: 200px; }
+  #store-filter { min-width: 150px; }
+  .toolbar-label { color: var(--muted); font-size: 11px; }
+  button.reset-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    padding: 7px 12px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all .2s;
+  }
+  button.reset-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── layout ── */
+  #layout {
+    display: grid;
+    grid-template-columns: 360px 1fr;
+    flex: 1;
+    overflow: hidden;
+    height: calc(100vh - 170px);
+  }
+
+  /* ── receipt list ── */
+  #receipt-list {
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .receipt-card {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background .15s;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 4px 10px;
+    align-items: start;
+  }
+  .receipt-card:hover { background: var(--surface2); }
+  .receipt-card.active { background: #e8f5ee; border-left: 2px solid var(--accent); }
+  .receipt-card.error { border-left: 2px solid var(--danger); opacity: .6; }
+  .rc-store {
+    font-family: 'Syne', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .rc-total {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--accent);
+    text-align: right;
+  }
+  .rc-date { font-size: 11px; color: var(--muted); }
+  .rc-items { font-size: 11px; color: var(--muted); text-align: right; }
+  .rc-filename {
+    grid-column: 1 / -1;
+    font-size: 10px;
+    color: var(--border);
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .error-badge {
+    grid-column: 1 / -1;
+    font-size: 10px;
+    color: var(--danger);
+  }
+  #no-results {
+    padding: 40px 20px;
+    text-align: center;
+    color: var(--muted);
+    display: none;
+  }
+
+  /* ── detail panel ── */
+  #detail {
+    overflow-y: auto;
+    padding: 24px 28px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  #detail-empty {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    font-size: 13px;
+  }
+  #detail-content { display: none; }
+  .detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 20px;
+    gap: 16px;
+  }
+  .detail-store {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 28px;
+    color: var(--accent);
+    line-height: 1.1;
+  }
+  .detail-meta { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+  .detail-total {
+    font-family: 'Syne', sans-serif;
+    font-size: 32px;
+    font-weight: 800;
+    color: var(--text);
+  }
+  .detail-date { font-size: 12px; color: var(--muted); }
+  .detail-file { font-size: 11px; color: var(--border); margin-bottom: 20px; }
+
+  /* items table */
+  .items-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 4px;
+  }
+  .items-table th {
+    text-align: left;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .items-table th.num { text-align: right; }
+  .items-table td {
+    padding: 10px 10px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  .items-table td.num { text-align: right; color: var(--accent2); font-variant-numeric: tabular-nums; }
+  .items-table td.total-col { text-align: right; color: var(--accent); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .items-table tr:hover td { background: var(--surface2); }
+  .tax-badge {
+    display: inline-block;
+    padding: 1px 5px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    font-size: 10px;
+    color: var(--muted);
+    margin-left: 6px;
+  }
+  .items-table tfoot td {
+    padding-top: 12px;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 15px;
+    border-top: 2px solid var(--accent);
+    border-bottom: none;
+  }
+  .items-table tfoot td.total-col { color: var(--accent); font-size: 18px; }
+
+  /* ── error state ── */
+  .detail-error {
+    padding: 20px;
+    background: #fdf0ef;
+    border: 1px solid var(--danger);
+    border-radius: var(--radius);
+    color: var(--danger);
+    font-size: 12px;
+    margin-top: 12px;
+  }
+
+  /* ── loading overlay ── */
+  #loading {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(13,13,13,.85);
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    flex-direction: column;
+    gap: 14px;
+    font-family: 'Syne', sans-serif;
+    font-size: 16px;
+    color: var(--accent);
+  }
+  .spinner {
+    width: 36px;
+    height: 36px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🧾 Kassabonnen</h1>
+  <span class="version">v<span id="v-span"></span></span>
+  <span id="db-name"></span>
+</header>
+
+<!-- Drop zone -->
+<div id="drop-zone">
+  <div class="icon">🗄️</div>
+  <h2>Sleep je database hierheen</h2>
+  <p>Gooi het <code>receipts.db</code> bestand op dit venster<br>of klik hieronder om het te kiezen.</p>
+  <label class="hint" for="file-input">📂 Kies bestand…</label>
+  <input type="file" id="file-input" accept=".db,.sqlite,.sqlite3">
+</div>
+
+<!-- Main app (hidden until DB loaded) -->
+<div id="app">
+  <div id="stats">
+    <div class="stat"><span class="label">Bonnen</span><span class="value" id="stat-count">0</span></div>
+    <div class="stat"><span class="label">Artikelen</span><span class="value" id="stat-items">0</span></div>
+    <div class="stat"><span class="label">Totaal uitgegeven</span><span class="value" id="stat-total">€0</span></div>
+    <div class="stat"><span class="label">Winkels</span><span class="value" id="stat-stores">0</span></div>
+  </div>
+
+  <div id="toolbar">
+    <input type="text" id="search" placeholder="🔍 Zoek artikel of winkel…">
+    <select id="store-filter"><option value="">Alle winkels</option></select>
+    <span class="toolbar-label">Van</span>
+    <input type="date" id="date-from">
+    <span class="toolbar-label">t/m</span>
+    <input type="date" id="date-to">
+    <button class="reset-btn" id="reset-btn">✕ Reset filters</button>
+  </div>
+
+  <div id="layout">
+    <div id="receipt-list">
+      <div id="no-results">Geen bonnen gevonden</div>
+    </div>
+    <div id="detail">
+      <div id="detail-empty">← Selecteer een bon</div>
+      <div id="detail-content"></div>
+    </div>
+  </div>
+</div>
+
+<div id="loading"><div class="spinner"></div><span>Database laden…</span></div>
+
+<!-- sql.js from CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
+
+<script>
+// # version : 20260526-113800 - Initial version
+const current_version = "20260526-113800";
+document.getElementById('v-span').textContent = current_version;
+
+let DB = null;
+let allReceipts = [];
+let activeId = null;
+
+// ── Init sql.js ──────────────────────────────────────────────────────────────
+const sqlPromise = initSqlJs({
+  locateFile: f => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/${f}`
+});
+
+// ── File input ───────────────────────────────────────────────────────────────
+const dropZone   = document.getElementById('drop-zone');
+const fileInput  = document.getElementById('file-input');
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('dragover'); loadFile(e.dataTransfer.files[0]); });
+fileInput.addEventListener('change', () => loadFile(fileInput.files[0]));
+
+async function loadFile(file) {
+  if (!file) return;
+  setLoading(true);
+  try {
+    const SQL = await sqlPromise;
+    const buf = await file.arrayBuffer();
+    DB = new SQL.Database(new Uint8Array(buf));
+    document.getElementById('db-name').textContent = '📁 ' + file.name;
+    document.getElementById('db-name').classList.add('visible');
+    initApp();
+  } catch(e) {
+    alert('Kon de database niet laden:\n' + e.message);
+  } finally {
+    setLoading(false);
+  }
+}
+
+// ── App init ─────────────────────────────────────────────────────────────────
+function initApp() {
+  allReceipts = query(`
+    SELECT id, filename, store, receipt_date, currency, item_count, total_amount, status, error_message
+    FROM receipts
+    ORDER BY receipt_date DESC, id DESC
+  `);
+
+  // stats
+  const okReceipts = allReceipts.filter(r => r.status === 'ok');
+  const totalItems = okReceipts.reduce((s, r) => s + (r.item_count || 0), 0);
+  const totalAmt   = okReceipts.reduce((s, r) => s + (r.total_amount || 0), 0);
+  const stores     = new Set(okReceipts.map(r => r.store).filter(Boolean)).size;
+
+  document.getElementById('stat-count').textContent  = allReceipts.length;
+  document.getElementById('stat-items').textContent  = totalItems;
+  document.getElementById('stat-total').textContent  = '€' + totalAmt.toFixed(2);
+  document.getElementById('stat-stores').textContent = stores;
+
+  // store filter
+  const storeSelect = document.getElementById('store-filter');
+  storeSelect.innerHTML = '<option value="">Alle winkels</option>';
+  const storeNames = [...new Set(okReceipts.map(r => r.store).filter(Boolean))].sort();
+  storeNames.forEach(s => {
+    const o = document.createElement('option');
+    o.value = o.textContent = s;
+    storeSelect.appendChild(o);
+  });
+
+  document.getElementById('drop-zone').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+
+  renderList(allReceipts);
+}
+
+// ── Filtering ─────────────────────────────────────────────────────────────────
+document.getElementById('search').addEventListener('input', applyFilters);
+document.getElementById('store-filter').addEventListener('change', applyFilters);
+document.getElementById('date-from').addEventListener('change', applyFilters);
+document.getElementById('date-to').addEventListener('change', applyFilters);
+document.getElementById('reset-btn').addEventListener('click', () => {
+  document.getElementById('search').value = '';
+  document.getElementById('store-filter').value = '';
+  document.getElementById('date-from').value = '';
+  document.getElementById('date-to').value = '';
+  applyFilters();
+});
+
+function applyFilters() {
+  const search    = document.getElementById('search').value.trim().toLowerCase();
+  const store     = document.getElementById('store-filter').value;
+  const dateFrom  = document.getElementById('date-from').value;
+  const dateTo    = document.getElementById('date-to').value;
+
+  let filtered = allReceipts;
+
+  if (store)    filtered = filtered.filter(r => r.store === store);
+  if (dateFrom) filtered = filtered.filter(r => r.receipt_date && r.receipt_date >= dateFrom);
+  if (dateTo)   filtered = filtered.filter(r => r.receipt_date && r.receipt_date <= dateTo);
+
+  if (search) {
+    // Also search in items descriptions
+    filtered = filtered.filter(r => {
+      if ((r.store || '').toLowerCase().includes(search)) return true;
+      if ((r.filename || '').toLowerCase().includes(search)) return true;
+      const items = query(`SELECT description FROM receipt_items WHERE receipt_id = ?`, [r.id]);
+      return items.some(i => (i.description || '').toLowerCase().includes(search));
+    });
+  }
+
+  renderList(filtered);
+}
+
+// ── Render list ───────────────────────────────────────────────────────────────
+function renderList(receipts) {
+  const list = document.getElementById('receipt-list');
+  // keep no-results div
+  const noRes = document.getElementById('no-results');
+  list.innerHTML = '';
+  list.appendChild(noRes);
+
+  if (receipts.length === 0) {
+    noRes.style.display = 'block';
+    return;
+  }
+  noRes.style.display = 'none';
+
+  receipts.forEach(r => {
+    const card = document.createElement('div');
+    card.className = 'receipt-card' + (r.status === 'error' ? ' error' : '') + (r.id === activeId ? ' active' : '');
+    card.dataset.id = r.id;
+
+    const store    = r.store || r.filename || '(onbekend)';
+    const dateStr  = r.receipt_date ? formatDate(r.receipt_date) : '—';
+    const currency = r.currency || 'EUR';
+    const total    = r.total_amount != null ? currencySymbol(currency) + r.total_amount.toFixed(2) : '—';
+    const itemsLbl = r.item_count ? r.item_count + ' artikel' + (r.item_count !== 1 ? 'en' : '') : '';
+
+    card.innerHTML = `
+      <span class="rc-store">${esc(store)}</span>
+      <span class="rc-total">${r.status === 'error' ? '⚠' : total}</span>
+      <span class="rc-date">${dateStr}</span>
+      <span class="rc-items">${itemsLbl}</span>
+      <span class="rc-filename">${esc(r.filename)}</span>
+      ${r.status === 'error' ? `<span class="error-badge">⚠ OCR mislukt</span>` : ''}
+    `;
+    card.addEventListener('click', () => selectReceipt(r.id));
+    list.appendChild(card);
+  });
+}
+
+// ── Detail panel ─────────────────────────────────────────────────────────────
+function selectReceipt(id) {
+  activeId = id;
+  // update active state
+  document.querySelectorAll('.receipt-card').forEach(c => {
+    c.classList.toggle('active', Number(c.dataset.id) === id);
+  });
+
+  const r = allReceipts.find(x => x.id === id);
+  if (!r) return;
+
+  const detailEmpty   = document.getElementById('detail-empty');
+  const detailContent = document.getElementById('detail-content');
+  detailEmpty.style.display = 'none';
+  detailContent.style.display = 'block';
+
+  if (r.status === 'error') {
+    detailContent.innerHTML = `
+      <div class="detail-header">
+        <div class="detail-store">${esc(r.filename)}</div>
+      </div>
+      <div class="detail-file">Origineel pad: ${esc(r.original_path || '—')}</div>
+      <div class="detail-error"><strong>OCR mislukt:</strong><br>${esc(r.error_message || 'Onbekende fout')}</div>
+    `;
+    return;
+  }
+
+  const items    = query(`SELECT * FROM receipt_items WHERE receipt_id = ? ORDER BY id`, [id]);
+  const currency = r.currency || 'EUR';
+  const sym      = currencySymbol(currency);
+  const total    = r.total_amount != null ? r.total_amount.toFixed(2) : '—';
+  const dateStr  = r.receipt_date ? formatDate(r.receipt_date) : '—';
+
+  let rows = '';
+  items.forEach(item => {
+    const taxBadge = item.tax_category ? `<span class="tax-badge">${esc(item.tax_category)}</span>` : '';
+    const qty      = item.quantity !== 1 ? `${item.quantity} ×` : '';
+    const uPrice   = item.quantity !== 1 ? `${sym}${Number(item.unit_price).toFixed(2)}` : '';
+    rows += `
+      <tr>
+        <td>${esc(item.description)}${taxBadge}</td>
+        <td class="num">${qty}</td>
+        <td class="num">${uPrice}</td>
+        <td class="total-col">${sym}${Number(item.total_price).toFixed(2)}</td>
+      </tr>`;
+  });
+
+  detailContent.innerHTML = `
+    <div class="detail-header">
+      <div class="detail-store">${esc(r.store || '(onbekend)')}</div>
+      <div class="detail-meta">
+        <span class="detail-total">${sym}${total}</span>
+        <span class="detail-date">📅 ${dateStr}</span>
+      </div>
+    </div>
+    <div class="detail-file">📁 ${esc(r.filename)}</div>
+    <table class="items-table">
+      <thead>
+        <tr>
+          <th>Artikel</th>
+          <th class="num">Aantal</th>
+          <th class="num">Stukprijs</th>
+          <th class="num">Totaal</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+      <tfoot>
+        <tr>
+          <td colspan="3">Totaal</td>
+          <td class="total-col">${sym}${total}</td>
+        </tr>
+      </tfoot>
+    </table>
+  `;
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function query(sql, params = []) {
+  if (!DB) return [];
+  try {
+    const stmt = DB.prepare(sql);
+    stmt.bind(params);
+    const cols = stmt.getColumnNames();
+    const rows = [];
+    while (stmt.step()) {
+      const row = stmt.getAsObject();
+      rows.push(row);
+    }
+    stmt.free();
+    return rows;
+  } catch(e) {
+    console.warn('SQL error:', e.message, sql);
+    return [];
+  }
+}
+
+function esc(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function formatDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d)) return iso;
+  return d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function currencySymbol(code) {
+  const map = { EUR: '€', USD: '$', GBP: '£', CHF: 'CHF ' };
+  return map[code] || (code + ' ');
+}
+
+function setLoading(on) {
+  document.getElementById('loading').style.display = on ? 'flex' : 'none';
+}
+</script>
+</body>
+</html>

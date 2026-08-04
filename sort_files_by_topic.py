@@ -74,10 +74,10 @@ for _noisy in (
 # *** USER CONFIGURATION — edit these two lines, nothing else is required ***
 # ---------------------------------------------------------------------------
 
-# INPUT_DIR:  Path = Path(r"C:\Users\rcxsm\Documents\docx")
-# OUTPUT_DIR: Path = Path(r"C:\Users\rcxsm\Documents\docx\sorted")
-INPUT_DIR:  Path = Path(r"C:\Users\rcxsm\Pictures\Screenshots\unsorted")
-OUTPUT_DIR: Path = Path(r"C:\Users\rcxsm\Pictures\Screenshots\sorted")
+INPUT_DIR:  Path = Path(r"C:\Users\rcxsm\Documents\docx")
+OUTPUT_DIR: Path = Path(r"C:\Users\rcxsm\Documents")
+# INPUT_DIR:  Path = Path(r"C:\Users\rcxsm\Pictures\Screenshots\unsorted")
+# OUTPUT_DIR: Path = Path(r"C:\Users\rcxsm\Pictures\Screenshots\sorted")
 
 # ---------------------------------------------------------------------------
 # Topic list
@@ -1681,8 +1681,8 @@ def main_loop_file_types() -> None:
         print(f"\nStart {extension} : {time.strftime('%H:%M:%S')}")
         start_time_e = int(time.time())
 
-        input_dir  = Path(f"C:\\Users\\rcxsm\\Documents\\{extension}\\unsorted").resolve()
-        output_dir = Path(f"C:\\Users\\rcxsm\\Documents\\{extension}\\sorted").resolve()
+        input_dir  = Path(f"C:\\Users\\rcxsm\\Documents\\UNSORTED\\{extension}\\unsorted").resolve()
+        output_dir = Path(f"C:\\Users\\rcxsm\\Documents\\sorted").resolve()
 
         if not input_dir.is_dir():
             log.error("Input directory does not exist: %s — skipping %s.", input_dir, extension)
@@ -1714,8 +1714,8 @@ if __name__ == "__main__":
     print(f"Start : {time.strftime('%H:%M:%S')}")
     start_time = int(time.time())
 
-    main()
-
+    # main()
+    main_loop_file_types()
     elapsed          = int(time.time()) - start_time
     minutes, seconds = divmod(elapsed, 60)
     print(f"End   : {time.strftime('%H:%M:%S')}")
