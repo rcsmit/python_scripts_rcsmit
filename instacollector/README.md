@@ -24,19 +24,28 @@ Sheet (`InstaCollections`) so a JS page can read and display them.
 pip install -r requirements.txt --break-system-packages
 ```
 
-## 4. Configure environment variables
+## 4. Configure the bot
+
+Run the setup script — it asks for each value and writes a `.env` file
+next to the bot (the bot loads it automatically on startup):
 
 ```bash
-export TELEGRAM_BOT_TOKEN="123456:ABC-your-bot-token"
-export SPREADSHEET_ID="1VxN3uBwHLji9Eig8YA7DJs9cVBWN2QIV74no16lb8fY"
-export WORKSHEET_NAME="Blad1"
-export GOOGLE_SERVICE_ACCOUNT_FILE="/path/to/service_account.json"
-export DEFAULT_COLLECTION="default"
-
-# Optional: only allow specific Telegram user IDs to add links.
-# Get your numeric ID by messaging @userinfobot on Telegram.
-export ALLOWED_USER_IDS="111111111,222222222"
+python setup_env.py
 ```
+
+It'll ask for:
+- Telegram bot token (from @BotFather)
+- Google Sheet ID (defaults to your InstaCollections sheet)
+- Worksheet/tab name (defaults to `Blad1`)
+- Path to your `service_account.json` key file
+- Default collection name
+- Allowed Telegram user IDs (optional — leave blank while testing; get
+  your numeric ID by messaging @userinfobot on Telegram)
+
+Re-run `python setup_env.py` any time to update a value; it shows your
+current settings as defaults. The `.env` file is written with restricted
+permissions (readable only by you) since it holds your bot token — never
+commit it to a public repo.
 
 ## 5. Run it
 
@@ -77,3 +86,36 @@ filter on `status == "active"`).
 - `chat_state.json` (which collection is "active" per chat) is created
   next to the script; back it up or set `STATE_FILE` to a persistent
   path if you're deploying somewhere with an ephemeral filesystem.
+
+## Deploying to Railway (keep it running 24/7)
+
+Railway runs this as a long-lived background worker, so it stays connected
+to Telegram continuously rather than relying on your own laptop being on.
+
+1. Push this folder to a GitHub repo. `.gitignore` already keeps `.env`
+   and `service_account.json` out of it — don't remove those entries.
+2. On [railway.com](https://railway.com), create a new project →
+   **Deploy from GitHub repo** → select your repo. `railway.json` tells
+   Railway to run `python insta_collector_bot.py` and always restart it
+   if it stops (`restartPolicyType: ALWAYS`) — that matters here since a
+   polling bot should never sit "stopped".
+3. Open the deployed service → **Variables** tab → add:
+   - `TELEGRAM_BOT_TOKEN`
+   - `SPREADSHEET_ID`
+   - `WORKSHEET_NAME`
+   - `DEFAULT_COLLECTION`
+   - `ALLOWED_USER_IDS` (optional)
+   - `GOOGLE_SERVICE_ACCOUNT_JSON` — paste the **entire contents** of your
+     `service_account.json` key file as one value (Railway has no file-secret
+     mount, so the bot reads credentials straight from this variable when
+     it's set — see `GOOGLE_SERVICE_ACCOUNT_JSON` in the script).
+   - You do **not** need `GOOGLE_SERVICE_ACCOUNT_FILE` on Railway.
+4. Railway deploys automatically on push. No domain/networking setup is
+   needed — this service makes outbound calls to Telegram, it doesn't
+   need to receive inbound HTTP traffic.
+5. Check logs in the Railway dashboard to confirm "Bot starting
+   (polling)..." appears and there are no auth errors.
+
+Redeploy any time by pushing to the connected branch — Railway rebuilds
+and restarts the worker automatically.
+

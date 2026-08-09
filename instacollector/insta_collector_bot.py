@@ -8,11 +8,14 @@ sheet and render a filtered "collection" for whoever the link is shared with.
 
 # version : 20260809-140000 - Initial version: link capture, collection switching, Google Sheets append
 # version : 20260809-141500 - Auto-load configuration from .env via python-dotenv
-current_version = "20260809-141500"
+# version : 20260809-160500 - Fix: caption cleanup now strips the raw matched URL (incl. tracking query string like ?igsh=) instead of the rebuilt clean URL, so leftovers no longer end up in the caption column
+# version : 20260809-170000 - Added GOOGLE_SERVICE_ACCOUNT_JSON support (paste raw key JSON) for platforms without file-secret mounts, e.g. Railway
+current_version = "20260809-170000"
 """
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import re
@@ -46,6 +49,10 @@ WORKSHEET_NAME = os.environ.get("WORKSHEET_NAME", "Blad1")
 GOOGLE_SERVICE_ACCOUNT_FILE = os.environ.get(
     "GOOGLE_SERVICE_ACCOUNT_FILE", "service_account.json"
 )
+# On platforms without file-secret mounts (e.g. Railway), paste the full
+# service account JSON key content into this variable instead. Takes
+# priority over GOOGLE_SERVICE_ACCOUNT_FILE when set.
+GOOGLE_SERVICE_ACCOUNT_JSON = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON", "")
 DEFAULT_COLLECTION = os.environ.get("DEFAULT_COLLECTION", "default")
 
 # Optional allowlist: comma-separated Telegram numeric user IDs.
@@ -145,9 +152,19 @@ state_store = ChatStateStore(STATE_FILE)
 class SheetWriter:
     """Thin wrapper around gspread, tolerant of a header row already present."""
 
-    def __init__(self, spreadsheet_id: str, worksheet_name: str, creds_file: str) -> None:
+    def __init__(
+        self,
+        spreadsheet_id: str,
+        worksheet_name: str,
+        creds_file: str,
+        creds_json: str = "",
+    ) -> None:
         scopes = ["https://www.googleapis.com/auth/spreadsheets"]
-        creds = Credentials.from_service_account_file(creds_file, scopes=scopes)
+        if creds_json:
+            info = json.loads(creds_json)
+            creds = Credentials.from_service_account_info(info, scopes=scopes)
+        else:
+            creds = Credentials.from_service_account_file(creds_file, scopes=scopes)
         client = gspread.authorize(creds)
         self._sheet = client.open_by_key(spreadsheet_id)
         self._worksheet_name = worksheet_name
@@ -181,7 +198,12 @@ sheet_writer: Optional[SheetWriter] = None
 def get_sheet_writer() -> SheetWriter:
     global sheet_writer
     if sheet_writer is None:
-        sheet_writer = SheetWriter(SPREADSHEET_ID, WORKSHEET_NAME, GOOGLE_SERVICE_ACCOUNT_FILE)
+        sheet_writer = SheetWriter(
+            SPREADSHEET_ID,
+            WORKSHEET_NAME,
+            GOOGLE_SERVICE_ACCOUNT_FILE,
+            GOOGLE_SERVICE_ACCOUNT_JSON,
+        )
     return sheet_writer
 
 
@@ -199,12 +221,12 @@ def instagram_type_from_kind(kind: str) -> str:
     return "post"
 
 
-def extract_links(text: str) -> list[tuple[str, str]]:
-    """Return list of (clean_url, type) for every Instagram link found in text."""
+def extract_links(text: str) -> list[tuple[str, str, str]]:
+    """Return list of (raw_matched_text, clean_url, type) for every Instagram link found in text."""
     results = []
     for match in INSTAGRAM_URL_RE.finditer(text):
         clean_url = f"https://www.instagram.com/{match.group('kind').lower()}/{match.group('code')}/"
-        results.append((clean_url, instagram_type_from_kind(match.group("kind"))))
+        results.append((match.group(0), clean_url, instagram_type_from_kind(match.group("kind"))))
     return results
 
 
@@ -212,10 +234,12 @@ def extract_tags(text: str) -> str:
     return ",".join(HASHTAG_RE.findall(text))
 
 
-def extract_caption(text: str, urls_found: list[str]) -> str:
+def extract_caption(text: str, raw_matches: list[str]) -> str:
     caption = text
-    for url in urls_found:
-        caption = caption.replace(url, "")
+    for raw in raw_matches:
+        # Remove the exact substring as it appeared in the message (including any
+        # tracking query string like ?igsh=...) so leftovers don't end up in the caption.
+        caption = caption.replace(raw, "")
     caption = HASHTAG_RE.sub("", caption)
     return caption.strip()
 
@@ -302,7 +326,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     collection = state_store.get(update.effective_chat.id).active_collection
     tags = extract_tags(text)
-    caption = extract_caption(text, [url for url, _ in found])
+    caption = extract_caption(text, [raw for raw, _, _ in found])
     added_by = user.username or user.first_name or str(user.id)
     now_iso = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
@@ -314,7 +338,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return
 
     added = []
-    for url, insta_type in found:
+    for _, url, insta_type in found:
         row = {
             "id": uuid.uuid4().hex[:12],
             "collection": collection,
