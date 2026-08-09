@@ -1,0 +1,20 @@
+# Secrets - nooit committen
+.env
+service_account.json
+instacollector-505015-e5ebeb765c40.json
+*.json.key
+*.json
+
+# Bot state
+chat_state.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+
+# OS/editor
+.DS_Store
+.vscode/
